@@ -71,14 +71,14 @@ There are only **2 connection points** — the frontend never talks to OpenClaw:
                       cron.remove)        │               │
                           │               │               │
                           ▼               │               │
-                     OpenClaw (:3010) ────┘          PostgreSQL
+                     OpenClaw (:18789) ────┘          PostgreSQL
                           │
                      runs AI agent
                      searches social
                      returns JSON signals
 ```
 
-1. **Backend → OpenClaw (WebSocket on :3010)**: Backend creates/removes cron jobs
+1. **Backend → OpenClaw (WebSocket on :18789)**: Backend creates/removes cron jobs
 2. **OpenClaw → Backend (HTTP POST to :4000)**: OpenClaw sends job results via webhook
 
 Both live on the same droplet so they communicate over `localhost`.

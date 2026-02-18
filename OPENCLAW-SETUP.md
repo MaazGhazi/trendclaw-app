@@ -5,7 +5,7 @@
 OpenClaw runs on the same Digital Ocean droplet as the backend and Postgres. The frontend (Vercel) never talks to OpenClaw directly.
 
 ```
-Frontend (Vercel)  ──HTTPS──▶  Backend (:4000)  ──WebSocket──▶  OpenClaw (:3010)
+Frontend (Vercel)  ──HTTPS──▶  Backend (:4000)  ──WebSocket──▶  OpenClaw (:18789)
                                     ◀──HTTP webhook POST──
 ```
 
@@ -17,7 +17,7 @@ The backend connects to OpenClaw's gateway via WebSocket to manage cron jobs (cr
 
 **Backend env var:**
 ```env
-OPENCLAW_GATEWAY_URL="ws://localhost:3010"
+OPENCLAW_GATEWAY_URL="ws://localhost:18789"
 ```
 
 The backend code in `backend/src/lib/openclaw/client.ts` handles:
@@ -88,7 +88,7 @@ npm start
 
 Verify it's running:
 ```bash
-curl http://localhost:3010/health
+curl http://localhost:18789/health
 ```
 
 ### 4. Set Up Postgres
@@ -115,7 +115,7 @@ Create `backend/.env`:
 ```env
 DATABASE_URL="postgresql://postgres:<strong-password>@localhost:5433/trendclaw?schema=public"
 JWT_SECRET="<generate-a-strong-secret>"
-OPENCLAW_GATEWAY_URL="ws://localhost:3010"
+OPENCLAW_GATEWAY_URL="ws://localhost:18789"
 OPENCLAW_WEBHOOK_TOKEN="<same-token-as-openclaw>"
 BACKEND_URL="http://localhost:4000"
 PORT=4000
@@ -204,7 +204,7 @@ curl -X POST http://localhost:4000/api/webhooks/openclaw \
 
 | Problem | Check |
 |---------|-------|
-| Backend can't connect to OpenClaw | Is OpenClaw running? Check `curl http://localhost:3010/health` |
+| Backend can't connect to OpenClaw | Is OpenClaw running? Check `curl http://localhost:18789/health` |
 | Webhook not receiving data | Does `OPENCLAW_WEBHOOK_TOKEN` match on both sides? |
 | Frontend can't reach backend | Is the reverse proxy running? Is `NEXT_PUBLIC_API_URL` correct? Is CORS_ORIGIN set? |
 | No signals appearing | Check OpenClaw logs for agent errors. Check backend logs for webhook parse errors |
