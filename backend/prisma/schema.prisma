@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String   @unique
+  plan       String   @default("free")
+  maxClients Int      @default(10) @map("max_clients")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  users          User[]
+  clients        Client[]
+  contentNiches  ContentNiche[]
+  signals        Signal[]
+  reports        Report[]
+  monitoringJobs MonitoringJob[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("member")
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model Client {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String
+  domain       String?
+  description  String?
+  linkedinUrl  String?  @map("linkedin_url")
+  twitterUrl   String?  @map("twitter_url")
+  facebookUrl  String?  @map("facebook_url")
+  instagramUrl String?  @map("instagram_url")
+  customUrls   Json     @default("[]") @map("custom_urls")
+  industry     String?
+  keywords     String[] @default([])
+  isActive     Boolean  @default(true) @map("is_active")
+  cronJobId    String?  @map("cron_job_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  signals Signal[]
+
+  @@index([tenantId], map: "idx_clients_tenant")
+  @@map("clients")
+}
+
+model ContentNiche {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  keywords  String[]
+  sources   String[] @default([])
+  cronJobId String?  @map("cron_job_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  signals Signal[]
+
+  @@map("content_niches")
+}
+
+model Signal {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  clientId   String?  @map("client_id") @db.Uuid
+  nicheId    String?  @map("niche_id") @db.Uuid
+  type       String
+  title      String
+  summary    String
+  sourceUrl  String?  @map("source_url")
+  sourceName String?  @map("source_name")
+  confidence Float    @default(0.5) @db.Real
+  rawData    Json?    @map("raw_data")
+  detectedAt DateTime @default(now()) @map("detected_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client        Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  niche         ContentNiche?  @relation(fields: [nicheId], references: [id], onDelete: SetNull)
+  reportSignals ReportSignal[]
+
+  @@index([tenantId], map: "idx_signals_tenant")
+  @@index([clientId], map: "idx_signals_client")
+  @@index([detectedAt], map: "idx_signals_detected")
+  @@map("signals")
+}
+
+model Report {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  title       String
+  reportDate  DateTime  @map("report_date") @db.Date
+  status      String    @default("pending")
+  content     Json?
+  signalCount Int       @default(0) @map("signal_count")
+  cronJobId   String?   @map("cron_job_id")
+  generatedAt DateTime? @map("generated_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reportSignals ReportSignal[]
+
+  @@index([tenantId, reportDate], map: "idx_reports_tenant_date")
+  @@map("reports")
+}
+
+model ReportSignal {
+  reportId  String @map("report_id") @db.Uuid
+  signalId  String @map("signal_id") @db.Uuid
+  section   String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  signal Signal @relation(fields: [signalId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, signalId])
+  @@map("report_signals")
+}
+
+model MonitoringJob {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  cronJobId  String    @unique @map("cron_job_id")
+  jobType    String    @map("job_type")
+  targetId   String?   @map("target_id") @db.Uuid
+  schedule   String
+  lastRunAt  DateTime? @map("last_run_at") @db.Timestamptz
+  lastStatus String?   @map("last_status")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_monitoring_jobs_tenant")
+  @@index([cronJobId], map: "idx_monitoring_jobs_cron")
+  @@map("monitoring_jobs")
+}
