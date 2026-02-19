@@ -16,7 +16,7 @@ export async function provisionClientCron(tenantId: string, client: Client): Pro
   const jobName = `tc:${tenantId}:${client.id}:client`;
   const prompt = buildClientMonitoringPrompt(client);
 
-  const result = (await openclawClient.request("cron.add", {
+  const result = await openclawClient.request("cron.add", {
     name: jobName,
     description: `Monitor ${client.name} for buying signals`,
     enabled: true,
@@ -31,9 +31,15 @@ export async function provisionClientCron(tenantId: string, client: Client): Pro
       mode: "webhook",
       to: BACKEND_WEBHOOK_URL,
     },
-  })) as { job: { id: string } };
+  }) as Record<string, unknown>;
 
-  const cronJobId = result.job.id;
+  console.log("cron.add response:", JSON.stringify(result, null, 2));
+
+  const cronJobId = (result as any).job?.id ?? (result as any).id ?? (result as any).jobId;
+  if (!cronJobId) {
+    console.error("Could not extract cron job ID from response:", result);
+    return null;
+  }
 
   // Track the monitoring job
   await prisma.monitoringJob.create({
