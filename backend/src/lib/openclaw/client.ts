@@ -133,7 +133,7 @@ export class OpenClawClient {
             if (!msg.ok) {
               p.reject(new Error(msg.error?.message || "OpenClaw request failed"));
             } else {
-              p.resolve(msg.result);
+              p.resolve(msg.payload);
             }
             return;
           }
