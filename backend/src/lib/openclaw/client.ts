@@ -2,6 +2,8 @@ import WebSocket from "ws";
 import { v4 as uuid } from "uuid";
 import { config } from "../../config.js";
 
+const PROTOCOL_VERSION = 3;
+
 type PendingRequest = {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -19,23 +21,31 @@ export class OpenClawClient {
       this.ws = new WebSocket(config.openclawGatewayUrl);
 
       this.ws.on("open", () => {
-        console.log("Connected to OpenClaw gateway");
-        this.connected = true;
-        resolve();
+        // Send the required connect handshake
+        this.sendHandshake();
       });
 
       this.ws.on("message", (data) => {
         try {
           const msg = JSON.parse(data.toString());
-          if (msg.id && this.pending.has(msg.id)) {
+
+          // Handle response frames (type: "res")
+          if (msg.type === "res" && msg.id && this.pending.has(msg.id)) {
             const p = this.pending.get(msg.id)!;
             clearTimeout(p.timeout);
             this.pending.delete(msg.id);
-            if (msg.error) {
-              p.reject(new Error(msg.error.message || "OpenClaw request failed"));
+            if (!msg.ok) {
+              p.reject(new Error(msg.error?.message || "OpenClaw request failed"));
             } else {
               p.resolve(msg.result);
             }
+            return;
+          }
+
+          // Handle event frames (type: "evt") like ticks
+          if (msg.type === "evt") {
+            // Ignore tick events, shutdown events, etc.
+            return;
           }
         } catch (err) {
           console.error("Failed to parse OpenClaw message:", err);
@@ -43,8 +53,11 @@ export class OpenClawClient {
       });
 
       this.ws.on("close", () => {
-        console.log("Disconnected from OpenClaw gateway");
+        const wasConnected = this.connected;
         this.connected = false;
+        if (wasConnected) {
+          console.log("Disconnected from OpenClaw gateway");
+        }
         this.scheduleReconnect();
       });
 
@@ -52,7 +65,62 @@ export class OpenClawClient {
         console.error("OpenClaw WebSocket error:", err.message);
         if (!this.connected) reject(err);
       });
+
+      // The connect handshake response will resolve this promise
+      const handshakeId = "handshake-" + uuid();
+      const handshakeTimeout = setTimeout(() => {
+        this.pending.delete(handshakeId);
+        reject(new Error("OpenClaw handshake timed out"));
+      }, 15000);
+
+      this.pending.set(handshakeId, {
+        resolve: () => {
+          clearTimeout(handshakeTimeout);
+          console.log("Connected to OpenClaw gateway");
+          this.connected = true;
+          resolve();
+        },
+        reject: (err) => {
+          clearTimeout(handshakeTimeout);
+          reject(err);
+        },
+        timeout: handshakeTimeout,
+      });
+
+      // Store the handshake ID so sendHandshake can use it
+      this._handshakeId = handshakeId;
     });
+  }
+
+  private _handshakeId: string | null = null;
+
+  private sendHandshake() {
+    if (!this.ws || !this._handshakeId) return;
+
+    const auth = config.openclawGatewayToken
+      ? { token: config.openclawGatewayToken }
+      : undefined;
+
+    this.ws.send(JSON.stringify({
+      type: "req",
+      id: this._handshakeId,
+      method: "connect",
+      params: {
+        minProtocol: PROTOCOL_VERSION,
+        maxProtocol: PROTOCOL_VERSION,
+        client: {
+          id: "gateway-client",
+          displayName: "TrendClaw Backend",
+          version: "1.0.0",
+          platform: "linux",
+          mode: "backend",
+        },
+        caps: [],
+        role: "operator",
+        scopes: ["operator.admin"],
+        auth,
+      },
+    }));
   }
 
   private scheduleReconnect() {
@@ -83,7 +151,7 @@ export class OpenClawClient {
       this.pending.set(id, { resolve, reject, timeout });
 
       this.ws!.send(JSON.stringify({
-        jsonrpc: "2.0",
+        type: "req",
         id,
         method,
         params,

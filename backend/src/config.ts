@@ -6,6 +6,7 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:3000",
   openclawGatewayUrl: process.env.OPENCLAW_GATEWAY_URL || "ws://localhost:18789",
   openclawWebhookToken: process.env.OPENCLAW_WEBHOOK_TOKEN || "",
+  openclawGatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN || "",
   databaseUrl: process.env.DATABASE_URL || "",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
 };
