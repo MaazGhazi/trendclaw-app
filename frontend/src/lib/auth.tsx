@@ -22,6 +22,7 @@ type AuthState = {
   tenant: Tenant | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   register: (email: string, password: string, name: string, tenantName: string) => Promise<void>;
   logout: () => void;
 };
@@ -49,6 +50,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setLoading(false);
     }
+  }, []);
+
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    const data = await api.post<{ token: string; user: User; tenant: Tenant }>(
+      "/api/auth/google",
+      { credential }
+    );
+    api.setToken(data.token);
+    setUser(data.user);
+    setTenant(data.tenant);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -80,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, tenant, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, tenant, loading, login, loginWithGoogle, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
