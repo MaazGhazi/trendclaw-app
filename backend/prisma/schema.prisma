@@ -30,10 +30,12 @@ model User {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
   email     String   @unique
-  password  String
+  password  String?
   name      String?
   role      String   @default("member")
   avatarUrl String?  @map("avatar_url")
+  provider  String   @default("email")
+  googleId  String?  @unique @map("google_id")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

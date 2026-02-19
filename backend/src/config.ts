@@ -7,4 +7,5 @@ export const config = {
   openclawGatewayUrl: process.env.OPENCLAW_GATEWAY_URL || "ws://localhost:18789",
   openclawWebhookToken: process.env.OPENCLAW_WEBHOOK_TOKEN || "",
   databaseUrl: process.env.DATABASE_URL || "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
 };
