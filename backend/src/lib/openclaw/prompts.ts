@@ -1,4 +1,5 @@
 import type { Client } from "@prisma/client";
+import { SIGNAL_TYPES, ALL_SIGNAL_TYPE_KEYS, type SignalTypeKey } from "../signal-types.js";
 
 export function buildClientMonitoringPrompt(client: Client): string {
   const socialUrls = [
@@ -9,6 +10,20 @@ export function buildClientMonitoringPrompt(client: Client): string {
   ].filter(Boolean);
 
   const customUrls = (client.customUrls as string[]) || [];
+
+  // Determine which signal types to monitor
+  const selectedKeys: SignalTypeKey[] =
+    client.monitorSignals.length > 0
+      ? (client.monitorSignals as SignalTypeKey[])
+      : ALL_SIGNAL_TYPE_KEYS;
+
+  // Build the "Look for:" list
+  const lookForItems = selectedKeys
+    .map((key, i) => `${i + 1}. ${SIGNAL_TYPES[key].promptFragment}`)
+    .join("\n");
+
+  // Build the valid type enum
+  const validTypes = selectedKeys.map((k) => `"${k}"`).join(", ");
 
   return `You are a business intelligence agent monitoring "${client.name}" for buying signals and notable activity.
 
@@ -21,15 +36,10 @@ ${customUrls.length > 0 ? `\nAdditional URLs:\n${customUrls.join("\n")}` : ""}
 ${client.keywords.length > 0 ? `\nKeywords to watch: ${client.keywords.join(", ")}` : ""}
 
 Search their LinkedIn page and social media pages for recent activity. Look for:
-1. **Executive changes** — new hires, departures, promotions (especially C-suite/VP level)
-2. **Funding events** — fundraising announcements, investment rounds
-3. **Hiring activity** — significant hiring posts, new team expansions
-4. **Product launches** — new products, features, or services announced
-5. **Expansion** — new offices, markets, or geographic expansion
-6. **Partnerships** — strategic partnerships, integrations, collaborations
+${lookForItems}
 
 Output a JSON array of signals. Each signal should have:
-- type: one of "executive_change", "funding", "hiring", "product_launch", "expansion", "partnership"
+- type: one of ${validTypes}
 - title: short headline (under 100 chars)
 - summary: 2-3 sentence description of what happened
 - sourceUrl: URL where you found this information

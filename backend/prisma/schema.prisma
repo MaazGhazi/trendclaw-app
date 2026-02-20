@@ -55,8 +55,9 @@ model Client {
   instagramUrl String?  @map("instagram_url")
   customUrls   Json     @default("[]") @map("custom_urls")
   industry     String?
-  keywords     String[] @default([])
-  isActive     Boolean  @default(true) @map("is_active")
+  keywords        String[] @default([])
+  monitorSignals  String[] @default([]) @map("monitor_signals")
+  isActive        Boolean  @default(true) @map("is_active")
   cronJobId    String?  @map("cron_job_id")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

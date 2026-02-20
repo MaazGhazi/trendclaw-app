@@ -15,7 +15,7 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { name, domain, description, linkedinUrl, twitterUrl, facebookUrl, instagramUrl, customUrls, industry, keywords } = req.body;
+  const { name, domain, description, linkedinUrl, twitterUrl, facebookUrl, instagramUrl, customUrls, industry, keywords, monitorSignals } = req.body;
 
   if (!name) {
     res.status(400).json({ error: "name is required" });
@@ -43,6 +43,7 @@ router.post("/", async (req, res) => {
       customUrls: customUrls || [],
       industry: industry || null,
       keywords: keywords || [],
+      monitorSignals: monitorSignals || [],
     },
   });
 
@@ -90,7 +91,7 @@ router.patch("/:id", async (req, res) => {
     return;
   }
 
-  const { name, domain, description, linkedinUrl, twitterUrl, facebookUrl, instagramUrl, customUrls, industry, keywords, isActive } = req.body;
+  const { name, domain, description, linkedinUrl, twitterUrl, facebookUrl, instagramUrl, customUrls, industry, keywords, monitorSignals, isActive } = req.body;
 
   const client = await prisma.client.update({
     where: { id: req.params.id },
@@ -105,6 +106,7 @@ router.patch("/:id", async (req, res) => {
       ...(customUrls !== undefined && { customUrls }),
       ...(industry !== undefined && { industry }),
       ...(keywords !== undefined && { keywords }),
+      ...(monitorSignals !== undefined && { monitorSignals }),
       ...(isActive !== undefined && { isActive }),
     },
   });

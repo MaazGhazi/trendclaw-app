@@ -8,10 +8,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+const SIGNAL_TYPE_OPTIONS = [
+  { key: "executive_change", label: "Executive Changes", description: "New hires, departures, promotions (C-suite/VP)" },
+  { key: "funding", label: "Funding Events", description: "Fundraising announcements, investment rounds" },
+  { key: "hiring", label: "Hiring Activity", description: "Significant hiring activity, team expansions" },
+  { key: "product_launch", label: "Product Launches", description: "New products, features, services" },
+  { key: "expansion", label: "Expansion", description: "New offices, markets, geographic growth" },
+  { key: "partnership", label: "Partnerships", description: "Strategic partnerships, integrations" },
+  { key: "social_posts", label: "Social Media Posts", description: "Recent social media posts and content activity" },
+  { key: "news_mentions", label: "News & Media", description: "Press coverage, news articles, media mentions" },
+  { key: "awards", label: "Awards & Recognition", description: "Awards, rankings, certifications" },
+  { key: "events", label: "Events", description: "Conference appearances, webinars, speaking engagements" },
+] as const;
+
 export default function NewClientPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedSignals, setSelectedSignals] = useState<string[]>(
+    SIGNAL_TYPE_OPTIONS.map((o) => o.key)
+  );
+
+  function toggleSignal(key: string) {
+    setSelectedSignals((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  }
+
+  function toggleAll() {
+    if (selectedSignals.length === SIGNAL_TYPE_OPTIONS.length) {
+      setSelectedSignals([]);
+    } else {
+      setSelectedSignals(SIGNAL_TYPE_OPTIONS.map((o) => o.key));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -20,6 +50,9 @@ export default function NewClientPage() {
 
     const formData = new FormData(e.currentTarget);
     const keywordsRaw = formData.get("keywords") as string;
+
+    // Send empty array if all selected (backwards compatible = monitor all)
+    const allSelected = selectedSignals.length === SIGNAL_TYPE_OPTIONS.length;
 
     try {
       await api.post("/api/clients", {
@@ -32,6 +65,7 @@ export default function NewClientPage() {
         instagramUrl: formData.get("instagramUrl") || null,
         industry: formData.get("industry") || null,
         keywords: keywordsRaw ? keywordsRaw.split(",").map((k) => k.trim()).filter(Boolean) : [],
+        monitorSignals: allSelected ? [] : selectedSignals,
       });
       router.push("/clients");
     } catch (err) {
@@ -97,6 +131,38 @@ export default function NewClientPage() {
             <div className="space-y-2">
               <Label htmlFor="keywords">Keywords (comma-separated)</Label>
               <Input id="keywords" name="keywords" placeholder="AI, machine learning, enterprise" />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>What to Monitor</Label>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {selectedSignals.length === SIGNAL_TYPE_OPTIONS.length ? "Deselect all" : "Select all"}
+                </button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {SIGNAL_TYPE_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.key}
+                    className="flex cursor-pointer items-start gap-2 rounded-md border p-3 hover:bg-muted/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSignals.includes(opt.key)}
+                      onChange={() => toggleSignal(opt.key)}
+                      className="mt-0.5 h-4 w-4 rounded border-input"
+                    />
+                    <div>
+                      <span className="text-sm font-medium">{opt.label}</span>
+                      <p className="text-xs text-muted-foreground">{opt.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="flex gap-3">

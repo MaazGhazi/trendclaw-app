@@ -5,6 +5,10 @@ export type SignalType =
   | "product_launch"
   | "expansion"
   | "partnership"
+  | "social_posts"
+  | "news_mentions"
+  | "awards"
+  | "events"
   | "trending_topic";
 
 export type Client = {
@@ -19,6 +23,7 @@ export type Client = {
   customUrls: string[];
   industry: string | null;
   keywords: string[];
+  monitorSignals: string[];
   isActive: boolean;
   cronJobId: string | null;
   createdAt: string;

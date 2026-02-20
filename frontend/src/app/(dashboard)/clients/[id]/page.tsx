@@ -10,6 +10,19 @@ import { Badge } from "@/components/ui/badge";
 
 type ClientWithSignals = Client & { signals: Signal[] };
 
+const SIGNAL_TYPE_LABELS: Record<string, string> = {
+  executive_change: "Executive Changes",
+  funding: "Funding Events",
+  hiring: "Hiring Activity",
+  product_launch: "Product Launches",
+  expansion: "Expansion",
+  partnership: "Partnerships",
+  social_posts: "Social Media Posts",
+  news_mentions: "News & Media",
+  awards: "Awards & Recognition",
+  events: "Events",
+};
+
 export default function ClientDetailPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -72,6 +85,17 @@ export default function ClientDetailPage() {
             </div>
           )}
           <p><strong>Monitoring:</strong> {client.cronJobId ? "Active cron job" : "Not provisioned"}</p>
+          <div className="flex flex-wrap gap-1 pt-1">
+            <strong>Signal Types:</strong>
+            {(client.monitorSignals.length > 0
+              ? client.monitorSignals
+              : Object.keys(SIGNAL_TYPE_LABELS)
+            ).map((key) => (
+              <Badge key={key} variant="outline">
+                {SIGNAL_TYPE_LABELS[key] || key}
+              </Badge>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
