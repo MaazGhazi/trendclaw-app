@@ -436,3 +436,4 @@ frontend/
 - **End-to-end**: Register → add client → wait for scan → check signals page → trigger report → view report
 - **Auth**: Verify tenant isolation (user A can't see user B's clients/signals)
 - **OpenClaw health**: Dashboard should show gateway connection status
+-   ssh root@143.110.218.58

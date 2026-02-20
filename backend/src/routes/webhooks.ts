@@ -54,7 +54,9 @@ router.post("/openclaw", async (req, res) => {
   }> = [];
 
   try {
-    const parsed = JSON.parse(summary);
+    // Strip markdown code fences if present (e.g. ```json ... ```)
+    const cleaned = summary.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    const parsed = JSON.parse(cleaned);
     signals = Array.isArray(parsed) ? parsed : parsed.signals || [];
   } catch {
     console.error(`Failed to parse signal JSON from job ${jobId}:`, summary);
