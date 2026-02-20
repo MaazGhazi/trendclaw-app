@@ -33,6 +33,8 @@ export async function provisionClientCron(tenantId: string, client: Client): Pro
     },
   }) as Record<string, unknown>;
 
+  console.log("cron.add response:", JSON.stringify(result));
+
   const cronJobId = (result as any)?.id;
   if (!cronJobId) {
     console.error("Could not extract cron job ID from response:", result);
