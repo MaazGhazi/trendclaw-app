@@ -54,8 +54,12 @@ router.post("/openclaw", async (req, res) => {
   }> = [];
 
   try {
-    // Strip markdown code fences if present (e.g. ```json ... ```)
-    const cleaned = summary.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+    let cleaned = summary.trim();
+    // Strip markdown code fences (```json ... ``` or ``` ... ```)
+    const fenceMatch = cleaned.match(/^```[\w]*\s*\n?([\s\S]*?)\n?\s*```\s*$/);
+    if (fenceMatch) {
+      cleaned = fenceMatch[1].trim();
+    }
     const parsed = JSON.parse(cleaned);
     signals = Array.isArray(parsed) ? parsed : parsed.signals || [];
   } catch {
