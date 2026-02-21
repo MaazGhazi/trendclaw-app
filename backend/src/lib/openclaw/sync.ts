@@ -8,13 +8,19 @@ const BACKEND_WEBHOOK_URL = process.env.BACKEND_URL
   : "http://localhost:4000/api/webhooks/openclaw";
 
 export async function provisionClientCron(tenantId: string, client: Client): Promise<string | null> {
+  console.log("[sync] Provisioning cron for client:", client.name, client.id);
+  console.log("[sync] OpenClaw connected:", openclawClient.isConnected());
+  console.log("[sync] Webhook URL:", BACKEND_WEBHOOK_URL);
+
   if (!openclawClient.isConnected()) {
-    console.warn("OpenClaw not connected, skipping cron provisioning");
+    console.warn("[sync] OpenClaw not connected, skipping cron provisioning");
     return null;
   }
 
   const jobName = `tc:${tenantId}:${client.id}:client`;
   const prompt = buildClientMonitoringPrompt(client);
+  console.log("[sync] Job name:", jobName);
+  console.log("[sync] Prompt length:", prompt.length);
 
   const result = await openclawClient.request("cron.add", {
     name: jobName,
@@ -53,6 +59,40 @@ export async function provisionClientCron(tenantId: string, client: Client): Pro
   });
 
   return cronJobId;
+}
+
+export async function forceRunCron(cronJobId: string): Promise<void> {
+  if (!openclawClient.isConnected()) {
+    throw new Error("OpenClaw gateway not connected");
+  }
+
+  console.log("[sync] Force-running cron job:", cronJobId);
+  const result = await openclawClient.request("cron.run", {
+    jobId: cronJobId,
+    mode: "force",
+  });
+  console.log("[sync] cron.run response:", JSON.stringify(result));
+}
+
+export async function listCronJobs(): Promise<unknown> {
+  if (!openclawClient.isConnected()) {
+    throw new Error("OpenClaw gateway not connected");
+  }
+  return openclawClient.request("cron.list", { includeDisabled: true });
+}
+
+export async function getCronRuns(cronJobId: string): Promise<unknown> {
+  if (!openclawClient.isConnected()) {
+    throw new Error("OpenClaw gateway not connected");
+  }
+  return openclawClient.request("cron.runs", { id: cronJobId, limit: 10 });
+}
+
+export async function getCronStatus(): Promise<unknown> {
+  if (!openclawClient.isConnected()) {
+    throw new Error("OpenClaw gateway not connected");
+  }
+  return openclawClient.request("cron.status", {});
 }
 
 export async function deprovisionCron(cronJobId: string): Promise<void> {

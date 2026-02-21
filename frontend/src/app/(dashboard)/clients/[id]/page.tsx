@@ -28,14 +28,37 @@ export default function ClientDetailPage() {
   const router = useRouter();
   const [client, setClient] = useState<ClientWithSignals | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
 
-  useEffect(() => {
+  function fetchClient() {
     api
       .get<{ client: ClientWithSignals }>(`/api/clients/${id}`)
       .then((data) => setClient(data.client))
       .catch(console.error)
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    fetchClient();
   }, [id]);
+
+  async function handleScan() {
+    setScanning(true);
+    setScanMessage(null);
+    try {
+      const result = await api.post<{ ok: boolean; message: string }>(`/api/clients/${id}/scan`, {});
+      setScanMessage(result.message || "Scan triggered! Signals will appear shortly.");
+      // Refresh signals after a delay to give the agent time to run
+      setTimeout(() => fetchClient(), 15000);
+      setTimeout(() => fetchClient(), 30000);
+      setTimeout(() => fetchClient(), 60000);
+    } catch (err: any) {
+      setScanMessage(`Scan failed: ${err.message}`);
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this client?")) return;
@@ -61,11 +84,20 @@ export default function ClientDetailPage() {
           <Badge variant={client.isActive ? "default" : "secondary"}>
             {client.isActive ? "Active" : "Paused"}
           </Badge>
+          <Button size="sm" onClick={handleScan} disabled={scanning}>
+            {scanning ? "Scanning..." : "Scan Now"}
+          </Button>
           <Button variant="destructive" size="sm" onClick={handleDelete}>
             Delete
           </Button>
         </div>
       </div>
+
+      {scanMessage && (
+        <div className={`rounded-md p-3 text-sm ${scanMessage.startsWith("Scan failed") ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
+          {scanMessage}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
