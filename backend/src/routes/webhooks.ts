@@ -82,11 +82,30 @@ router.post("/openclaw", async (req, res) => {
 
   try {
     let cleaned = summary.trim();
-    // Strip markdown code fences (```json ... ``` or ``` ... ```)
-    const fenceMatch = cleaned.match(/^```[\w]*\s*\n?([\s\S]*?)\n?\s*```\s*$/);
+
+    // Strip markdown code fences — try multiple patterns
+    // Pattern 1: ```json ... ``` or ``` ... ```
+    const fenceMatch = cleaned.match(/```[\w]*\s*\n?([\s\S]*?)\n?\s*```/);
     if (fenceMatch) {
       cleaned = fenceMatch[1].trim();
     }
+
+    // If it still doesn't look like JSON, try to find a JSON array in the text
+    if (!cleaned.startsWith("[") && !cleaned.startsWith("{")) {
+      const arrayMatch = cleaned.match(/(\[[\s\S]*\])/);
+      if (arrayMatch) {
+        cleaned = arrayMatch[1].trim();
+      }
+    }
+
+    // If the summary is not parseable JSON at all (e.g. an error message from the agent), skip
+    if (!cleaned.startsWith("[") && !cleaned.startsWith("{")) {
+      console.warn("[webhook] Summary is not JSON, likely an agent error message");
+      console.warn("[webhook] Summary (first 300 chars):", summary.substring(0, 300));
+      res.json({ ok: true, signals: 0, error: "Agent did not return JSON" });
+      return;
+    }
+
     const parsed = JSON.parse(cleaned);
     signals = Array.isArray(parsed) ? parsed : parsed.signals || [];
     console.log("[webhook] Parsed %d signals from summary", signals.length);

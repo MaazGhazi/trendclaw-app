@@ -25,17 +25,33 @@ export function buildClientMonitoringPrompt(client: Client): string {
   // Build the valid type enum
   const validTypes = selectedKeys.map((k) => `"${k}"`).join(", ");
 
+  // Build search queries the agent should run
+  const searchQueries = [
+    `"${client.name}" recent news announcements`,
+    client.linkedinUrl && `"${client.name}" site:linkedin.com`,
+    client.domain && `site:${client.domain} news OR blog OR press`,
+    client.keywords.length > 0 && `"${client.name}" ${client.keywords.slice(0, 3).join(" OR ")}`,
+  ].filter(Boolean);
+
   return `You are a business intelligence agent monitoring "${client.name}" for buying signals and notable activity.
 
 Company: ${client.name}
 ${client.domain ? `Website: ${client.domain}` : ""}
 ${client.industry ? `Industry: ${client.industry}` : ""}
 ${client.description ? `Description: ${client.description}` : ""}
-${socialUrls.length > 0 ? `\nSocial Media Pages:\n${socialUrls.join("\n")}` : ""}
+${socialUrls.length > 0 ? `\nKnown social pages:\n${socialUrls.join("\n")}` : ""}
 ${customUrls.length > 0 ? `\nAdditional URLs:\n${customUrls.join("\n")}` : ""}
 ${client.keywords.length > 0 ? `\nKeywords to watch: ${client.keywords.join(", ")}` : ""}
 
-Search their LinkedIn page and social media pages for recent activity. Look for:
+INSTRUCTIONS:
+Use the web_search tool to search for recent news and activity about this company. Run multiple searches to get comprehensive coverage.
+
+Suggested searches:
+${searchQueries.map((q) => `- ${q}`).join("\n")}
+
+Then use web_fetch to read any promising result pages for details.
+
+Look for these buying signals:
 ${lookForItems}
 
 Output a JSON array of signals. Each signal should have:
@@ -43,12 +59,12 @@ Output a JSON array of signals. Each signal should have:
 - title: short headline (under 100 chars)
 - summary: 2-3 sentence description of what happened
 - sourceUrl: URL where you found this information
-- sourceName: name of the source (e.g. "LinkedIn", "Twitter")
+- sourceName: name of the source (e.g. "LinkedIn", "Google News", "Company Blog")
 - confidence: 0.0 to 1.0 indicating how confident you are this is real
 
 If you find no notable signals, return an empty array: []
 
-Respond ONLY with valid JSON. No markdown, no explanation.`;
+Respond ONLY with valid JSON. No markdown, no code fences, no explanation.`;
 }
 
 export function buildNicheMonitoringPrompt(name: string, keywords: string[], sources: string[]): string {
@@ -57,7 +73,17 @@ export function buildNicheMonitoringPrompt(name: string, keywords: string[], sou
 Keywords: ${keywords.join(", ")}
 ${sources.length > 0 ? `Sources to check: ${sources.join(", ")}` : ""}
 
-Search for trending content, news, and discussions related to these keywords. Look for:
+INSTRUCTIONS:
+Use the web_search tool to search for trending content, news, and discussions related to these keywords. Run multiple searches.
+
+Suggested searches:
+- ${keywords.slice(0, 3).join(" OR ")} trending news
+- ${name} latest developments
+${sources.length > 0 ? sources.map((s) => `- site:${s} ${keywords[0] || name}`).join("\n") : ""}
+
+Then use web_fetch to read promising result pages for details.
+
+Look for:
 1. **Trending topics** — viral discussions, emerging trends
 2. **Industry news** — major announcements in this space
 3. **Content opportunities** — topics that are gaining traction and would be good for content creation
@@ -72,5 +98,5 @@ Output a JSON array of signals. Each signal should have:
 
 If you find no notable signals, return an empty array: []
 
-Respond ONLY with valid JSON. No markdown, no explanation.`;
+Respond ONLY with valid JSON. No markdown, no code fences, no explanation.`;
 }
