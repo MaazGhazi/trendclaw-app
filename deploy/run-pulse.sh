@@ -136,8 +136,8 @@ while IFS='|' read -r SAFE_NAME SOURCE_NAME ITEM_COUNT SOURCE_FILE; do
     # Launch agent in background, capture output to file
     (
         openclaw agent \
+            --agent source \
             --session-id "source-${SAFE_NAME}" \
-            --model "openai/gpt-4o-mini" \
             --json \
             --timeout 45 \
             --message "$AGENT_MSG" \
@@ -519,7 +519,6 @@ SUMMARY_ERR="$AGENT_OUT_DIR/_summary.err"
 
 openclaw agent \
     --session-id "summary-${TYPE}" \
-    --model "openai/gpt-4o" \
     --json \
     --timeout 60 \
     --message "$SUMMARY_MSG" \
@@ -694,7 +693,7 @@ else
   echo "[$(date -u +%H:%M:%S)] WARNING: Webhook returned HTTP $HTTP_CODE"
 fi
 
-# Cleanup temp files
-rm -rf "$TMP_DIR" "$AGENT_OUT_DIR"
+# Cleanup temp files (keep for debugging until stable)
+# rm -rf "$TMP_DIR" "$AGENT_OUT_DIR"
 
-echo "[$(date -u +%H:%M:%S)] Done."
+echo "[$(date -u +%H:%M:%S)] Done. Debug files at $TMP_DIR and $AGENT_OUT_DIR"
