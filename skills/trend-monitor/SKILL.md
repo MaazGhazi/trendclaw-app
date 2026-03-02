@@ -57,7 +57,13 @@ After analyzing the pre-collected data, use `web_search` to:
 - Fill gaps if browser sources failed (Google Trends, TikTok)
 - Catch any breaking news that happened AFTER the scraper ran
 
-Example gap-filling searches:
+**CoinGecko enrichment:**
+For each CoinGecko trending coin, do a web search to find the story behind it:
+- `web_search("{coin_name} news today")`
+- Include the catalyst in `why_trending` and link to source articles in `urls`
+- This turns raw price data into actionable intelligence: "Solana up 15%" becomes "Solana up 15% after Firedancer validator launch"
+
+**General gap-filling searches:**
 - `web_search("{trend_title} explained")`
 - `web_search("trending on twitter X right now")` (if no X data in scraped results)
 - `web_search("why is {topic} trending today")`
@@ -129,7 +135,7 @@ ALWAYS return your final analysis as a JSON code block:
 **Source-specific scoring:**
 - HN: score 500+ = 80+, score 200+ = 60+, score 100+ = 40+
 - Reddit: 5K+ upvotes = 80+, 2K+ = 60+, 500+ = 40+
-- CoinGecko: 24h change > 20% = 80+, > 10% = 60+, trending list = 50+
+- CoinGecko: 24h change > 20% = 80+, > 10% = 60+, trending list = 50+. Always web_search for the WHY behind price movements — include the catalyst in why_trending.
 - Wikipedia: 500K+ views = 80+, 200K+ = 60+, 100K+ = 40+
 - YouTube: 1M+ views = 80+, 500K+ = 60+, 100K+ = 40+
 

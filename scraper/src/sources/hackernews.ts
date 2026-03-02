@@ -24,15 +24,31 @@ export async function collect(runType: RunType): Promise<SourceResult> {
   const limit = runType === "pulse" ? 10 : runType === "digest" ? 20 : 30;
 
   try {
-    const res = await fetch(`${BASE}/topstories.json`);
-    if (!res.ok) throw new Error(`HN API returned ${res.status}`);
-    const ids: number[] = await res.json();
-    const topIds = ids.slice(0, limit);
+    const [topRes, bestRes] = await Promise.all([
+      fetch(`${BASE}/topstories.json`),
+      fetch(`${BASE}/beststories.json`),
+    ]);
+    if (!topRes.ok) throw new Error(`HN top API returned ${topRes.status}`);
+    if (!bestRes.ok) throw new Error(`HN best API returned ${bestRes.status}`);
+
+    const topIds: number[] = await topRes.json();
+    const bestIds: number[] = await bestRes.json();
+
+    // Merge both lists, deduplicate, take top N
+    const seen = new Set<number>();
+    const mergedIds: number[] = [];
+    for (const id of [...topIds, ...bestIds]) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        mergedIds.push(id);
+      }
+      if (mergedIds.length >= limit) break;
+    }
 
     const items: ScrapedItem[] = [];
     // Fetch in batches of 10 to avoid hammering
-    for (let i = 0; i < topIds.length; i += 10) {
-      const batch = topIds.slice(i, i + 10);
+    for (let i = 0; i < mergedIds.length; i += 10) {
+      const batch = mergedIds.slice(i, i + 10);
       const results = await Promise.all(batch.map(fetchItem));
       for (const r of results) {
         if (r) items.push(r);
