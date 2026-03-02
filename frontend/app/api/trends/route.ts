@@ -30,8 +30,11 @@ function getLatestFile(): string | null {
   const files = fs
     .readdirSync(DATA_DIR)
     .filter((f) => f.endsWith(".json"))
-    .sort()
-    .reverse();
+    .sort((a, b) => {
+      const aStat = fs.statSync(path.join(DATA_DIR, a));
+      const bStat = fs.statSync(path.join(DATA_DIR, b));
+      return bStat.mtimeMs - aStat.mtimeMs;
+    });
   return files[0] || null;
 }
 

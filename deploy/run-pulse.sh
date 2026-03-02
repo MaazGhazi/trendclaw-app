@@ -59,6 +59,12 @@ RESULT=$(openclaw agent --session-id "$SESSION_ID" --message "$MSG" --json --tim
 TMPFILE=$(mktemp /tmp/trendclaw-XXXXXX.json)
 echo "$RESULT" > "$TMPFILE"
 
+# Save a debug copy of raw agent output
+DEBUG_DIR="$HOME/trendclaw-app/debug"
+mkdir -p "$DEBUG_DIR"
+cp "$TMPFILE" "$DEBUG_DIR/raw-${TYPE}-$(date +%s).json"
+echo "[$(date -u +%H:%M:%S)] Raw agent output saved to $DEBUG_DIR"
+
 # Extract and normalize agent output
 PYSCRIPT=$(mktemp /tmp/trendclaw-parse-XXXXXX.py)
 cat > "$PYSCRIPT" << 'PYEOF'
