@@ -39,13 +39,6 @@
         }
       },
 
-      "session": {
-        "reset": {
-          "mode": "daily",
-          "atHour": 4
-        }
-      },
-
       "timeoutSeconds": 600
     }
   },

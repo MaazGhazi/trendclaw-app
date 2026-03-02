@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.env
+.env.local
+*.log
+
+# Frontend data store
+frontend/data/*.json
+
+# Scraper output
+scraper/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
