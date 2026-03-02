@@ -59,7 +59,8 @@ with open(pf, 'w') as f:
 
 echo "[$(date -u +%H:%M:%S)] TrendClaw $TYPE run starting (agent pipeline)"
 
-# Write initial progress
+# Reset progress for this new run
+rm -f "$PROGRESS_FILE"
 write_progress "p['steps']['scraper']['status'] = 'running'"
 
 SCRAPER_START=$(date +%s)
