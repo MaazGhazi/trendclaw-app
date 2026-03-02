@@ -54,11 +54,12 @@ TMPFILE=$(mktemp /tmp/trendclaw-XXXXXX.json)
 echo "$RESULT" > "$TMPFILE"
 
 # Extract and normalize agent output
-AGENT_OUTPUT=$(python3 << 'PYEOF'
+PYSCRIPT=$(mktemp /tmp/trendclaw-parse-XXXXXX.py)
+cat > "$PYSCRIPT" << 'PYEOF'
 import sys, json, re
 from datetime import datetime, timezone
 
-run_type = sys.argv[1] if len(sys.argv) > 1 else "pulse"
+run_type = sys.argv[1]
 
 with open(sys.argv[2]) as f:
     raw = f.read()
@@ -197,7 +198,8 @@ except Exception as e:
     }
     print(json.dumps(fallback))
 PYEOF
- "$TYPE" "$TMPFILE" 2>&1)
+AGENT_OUTPUT=$(python3 "$PYSCRIPT" "$TYPE" "$TMPFILE" 2>&1)
+rm -f "$PYSCRIPT"
 
 rm -f "$TMPFILE"
 
