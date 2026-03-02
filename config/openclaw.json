@@ -1,0 +1,105 @@
+{
+  "models": {
+    "mode": "merge"
+  },
+
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openai/gpt-4o",
+        "fallbacks": ["openai/gpt-4o-mini"]
+      },
+
+      "models": {
+        "openai/gpt-4o": { "alias": "gpt4o" },
+        "openai/gpt-4o-mini": { "alias": "mini" }
+      },
+
+      "workspace": "~/.openclaw/workspace",
+
+      "contextTokens": 120000,
+
+      "bootstrapMaxChars": 8000,
+      "bootstrapTotalMaxChars": 50000,
+
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "3m",
+        "keepLastAssistants": 3,
+        "softTrimRatio": 0.3,
+        "hardClearRatio": 0.5,
+        "minPrunableToolChars": 30000
+      },
+
+      "compaction": {
+        "mode": "safeguard",
+        "reserveTokensFloor": 20000,
+        "memoryFlush": {
+          "enabled": true
+        }
+      },
+
+      "session": {
+        "reset": {
+          "mode": "daily",
+          "atHour": 4
+        }
+      },
+
+      "timeoutSeconds": 600
+    }
+  },
+
+  "tools": {
+    "deny": [
+      "canvas",
+      "nodes",
+      "apply_patch",
+      "write",
+      "edit",
+      "image"
+    ],
+
+    "web": {
+      "search": {
+        "provider": "brave",
+        "apiKey": "${BRAVE_API_KEY}",
+        "maxResults": 12,
+        "timeoutSeconds": 30
+      }
+    },
+
+    "media": {
+      "audio": { "enabled": false },
+      "video": { "enabled": false }
+    }
+  },
+
+  "hooks": {
+    "enabled": true,
+    "token": "${OPENCLAW_HOOKS_TOKEN}",
+    "path": "/hooks",
+    "allowRequestSessionKey": false,
+    "allowedSessionKeyPrefixes": ["hook:"]
+  },
+
+  "cron": {
+    "enabled": true,
+    "maxConcurrentRuns": 2,
+    "webhookToken": "${OPENCLAW_HOOKS_TOKEN}"
+  },
+
+  "gateway": {
+    "port": 18789,
+    "auth": {
+      "mode": "password",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    }
+  },
+
+  "skills": {
+    "limits": {
+      "maxSkillsInPrompt": 5
+    }
+  }
+}

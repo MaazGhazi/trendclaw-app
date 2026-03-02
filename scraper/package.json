@@ -1,0 +1,23 @@
+{
+  "name": "trendclaw-scraper",
+  "version": "1.0.0",
+  "description": "Data collector for TrendClaw trend monitoring",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "scrape": "node dist/index.js",
+    "scrape:pulse": "node dist/index.js --type pulse",
+    "scrape:digest": "node dist/index.js --type digest",
+    "scrape:deep_dive": "node dist/index.js --type deep_dive"
+  },
+  "dependencies": {
+    "playwright": "^1.50.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "fast-xml-parser": "^4.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
