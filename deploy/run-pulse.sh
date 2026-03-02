@@ -10,7 +10,8 @@ TYPE="${1:-pulse}"
 WEBHOOK_URL="${TRENDCLAW_WEBHOOK_URL:-http://localhost:3000/api/trends}"
 WEBHOOK_TOKEN="${OPENCLAW_HOOKS_TOKEN:-}"
 SCRAPER_DIR="$HOME/trendclaw-app/scraper"
-DATA_FILE="$SCRAPER_DIR/output/latest-${TYPE}.json"
+SCRAPER_OUTPUT="${SCRAPER_OUTPUT_DIR:-$SCRAPER_DIR/output}"
+DATA_FILE="$SCRAPER_OUTPUT/latest-${TYPE}.json"
 
 echo "[$(date -u +%H:%M:%S)] TrendClaw $TYPE run starting"
 

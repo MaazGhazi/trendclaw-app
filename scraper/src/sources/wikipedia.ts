@@ -5,52 +5,58 @@ const BASE = "https://wikimedia.org/api/rest_v1/metrics/pageviews";
 
 export async function collect(_runType: RunType): Promise<SourceResult> {
   async function attempt(): Promise<SourceResult> {
-    // Get yesterday's most viewed (today's data isn't complete yet)
+    // Try yesterday first, fall back to 2 days ago (data can lag)
     const now = new Date();
-    const yesterday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
-    const year = yesterday.getUTCFullYear();
-    const month = String(yesterday.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(yesterday.getUTCDate()).padStart(2, "0");
-    const dateStr = `${year}/${month}/${day}`;
+    const dates = [1, 2].map((daysAgo) => {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysAgo));
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      return `${y}/${m}/${day}`;
+    });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const res = await fetch(
-        `${BASE}/top/en.wikipedia/all-access/${dateStr}`,
-        {
-          headers: { "User-Agent": "TrendClaw/1.0 (trend monitoring)" },
-          signal: controller.signal,
+    let data: any = null;
+    for (const dateStr of dates) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const res = await fetch(
+          `${BASE}/top/en.wikipedia/all-access/${dateStr}`,
+          {
+            headers: { "User-Agent": "TrendClaw/1.0 (trend monitoring)" },
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeout);
+        if (res.ok) {
+          data = await res.json();
+          break;
         }
-      );
-      clearTimeout(timeout);
-
-      if (!res.ok) throw new Error(`Wikipedia API returned ${res.status}`);
-      const data = await res.json();
-
-      const articles = data.items?.[0]?.articles ?? [];
-      // Filter out Main_Page and Special: pages
-      const items: ScrapedItem[] = articles
-        .filter((a: any) => !a.article.startsWith("Special:") && a.article !== "Main_Page")
-        .slice(0, 25)
-        .map((a: any) => ({
-          title: a.article.replace(/_/g, " "),
-          url: `https://en.wikipedia.org/wiki/${a.article}`,
-          views: a.views,
-          rank: a.rank,
-        }));
-
-      return {
-        source: "Wikipedia Most Viewed",
-        status: "ok",
-        items,
-        scrapedAt: new Date().toISOString(),
-      };
-    } catch (e) {
-      clearTimeout(timeout);
-      throw e;
+      } catch {
+        clearTimeout(timeout);
+      }
     }
+
+    if (!data) throw new Error("Wikipedia API returned 404 for both yesterday and 2 days ago");
+
+    const articles = data.items?.[0]?.articles ?? [];
+    // Filter out Main_Page and Special: pages
+    const items: ScrapedItem[] = articles
+      .filter((a: any) => !a.article.startsWith("Special:") && a.article !== "Main_Page")
+      .slice(0, 25)
+      .map((a: any) => ({
+        title: a.article.replace(/_/g, " "),
+        url: `https://en.wikipedia.org/wiki/${a.article}`,
+        views: a.views,
+        rank: a.rank,
+      }));
+
+    return {
+      source: "Wikipedia Most Viewed",
+      status: "ok",
+      items,
+      scrapedAt: new Date().toISOString(),
+    };
   }
 
   // Try once, retry once on failure with 1s delay
