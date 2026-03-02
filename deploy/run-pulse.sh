@@ -78,9 +78,9 @@ def build_metric(item):
             parts.append(f"+{ts} today")
     if item.get('priceChange'):
         parts.append(item['priceChange'])
-    if item.get('volume') and str(item['volume']) != 'undefined':
+    if item.get('volume') and 'undefined' not in str(item['volume']):
         parts.append(f"vol {item['volume']}")
-    if item.get('marketCap') and str(item['marketCap']) != 'undefined':
+    if item.get('marketCap') and 'undefined' not in str(item['marketCap']):
         parts.append(f"mcap {item['marketCap']}")
     if item.get('rank'):
         parts.append(f"#{item['rank']}")
