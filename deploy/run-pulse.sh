@@ -80,80 +80,125 @@ SPLIT_RESULT=$(python3 "$SPLIT_SCRIPT" "$DATA_FILE" "$TMP_DIR" 2>&1)
 rm -f "$SPLIT_SCRIPT"
 echo "[$(date -u +%H:%M:%S)] Split: $SPLIT_RESULT"
 
-# ─── Step 3: Parallel per-source agent calls ───────────────────────────────────
-echo "[$(date -u +%H:%M:%S)] Launching per-source agents..."
+# ─── Step 3: Parallel per-source agent calls (direct OpenAI API) ───────────────
+echo "[$(date -u +%H:%M:%S)] Launching per-source agents (parallel)..."
 
 TODAY=$(date -u +%Y-%m-%d)
-AGENT_COUNT=0
-AGENT_FAILURES=0
 
-# Read manifest
-MANIFEST="$TMP_DIR/_manifest.json"
+SOURCE_AGENT_SCRIPT=$(mktemp /tmp/trendclaw-agents-XXXXXX.py)
+cat > "$SOURCE_AGENT_SCRIPT" << 'PYEOF'
+import sys, json, os, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
-LAUNCH_SCRIPT=$(mktemp /tmp/trendclaw-launch-XXXXXX.py)
-cat > "$LAUNCH_SCRIPT" << 'PYEOF'
-import json, sys
 manifest_file = sys.argv[1]
+agent_out_dir = sys.argv[2]
+today = sys.argv[3]
+run_type = sys.argv[4]
+api_key = os.environ.get('OPENAI_API_KEY', '')
+
 with open(manifest_file) as f:
     manifest = json.load(f)
-# Print only active sources (have a file)
-for src in manifest:
-    if src.get('file'):
-        print(f"{src['safe_name']}|{src['name']}|{src['items']}|{src['file']}")
+
+active = [s for s in manifest if s.get('file')]
+
+def call_openai(source_name, safe_name, item_count, source_file):
+    """Call OpenAI gpt-4o-mini for a single source."""
+    with open(source_file) as f:
+        source_data = json.dumps(json.load(f))
+
+    prompt = f"""Today is {today}. Run type: {run_type}. You are analyzing {source_name} ({item_count} items).
+
+Here is the data:
+{source_data}
+
+For each item, determine:
+- Momentum: rising (growing engagement), falling (declining), stable, new (first appearance), viral (>10x growth)
+- Why is it trending? Explain the catalyst in 1-2 sentences.
+- Score 0-100 based on engagement signals. Include raw numbers in the metric field.
+
+Return ONLY a JSON object:
+{{
+  "source": "{source_name}",
+  "trends": [
+    {{
+      "title": "...",
+      "description": "1-2 sentence factual summary",
+      "why_trending": "Why this is trending right now",
+      "momentum": "rising|falling|stable|new|viral",
+      "popularity": {{"score": 0-100, "metric": "raw numbers from data", "reach": "high|medium|low"}},
+      "urls": ["..."],
+      "first_seen": "ISO date or null",
+      "relevance": "high|medium|low"
+    }}
+  ]
+}}"""
+
+    body = json.dumps({
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You are a trend analysis agent. Return ONLY valid JSON, no markdown fences."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.3,
+        "response_format": {"type": "json_object"}
+    }).encode()
+
+    req = Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+    )
+
+    start = time.time()
+    resp = urlopen(req, timeout=45)
+    result = json.loads(resp.read().decode())
+    content = result['choices'][0]['message']['content']
+    elapsed = time.time() - start
+
+    # Write raw output to file
+    out_file = os.path.join(agent_out_dir, f"{safe_name}.json")
+    with open(out_file, 'w') as f:
+        f.write(content)
+
+    return safe_name, source_name, len(content), elapsed
+
+succeeded = 0
+failed = 0
+
+with ThreadPoolExecutor(max_workers=10) as pool:
+    futures = {}
+    for src in active:
+        fut = pool.submit(
+            call_openai,
+            src['name'], src['safe_name'], src['items'], src['file']
+        )
+        futures[fut] = src
+
+    for fut in as_completed(futures):
+        src = futures[fut]
+        try:
+            safe, name, size, elapsed = fut.result()
+            succeeded += 1
+            print(f"  ✓ {name}: {size}b ({elapsed:.1f}s)")
+        except Exception as e:
+            failed += 1
+            err_str = str(e)
+            print(f"  ✗ {src['name']}: {err_str[:120]}")
+            # Write error to err file
+            err_file = os.path.join(agent_out_dir, f"{src['safe_name']}.err")
+            with open(err_file, 'w') as ef:
+                ef.write(err_str)
+
+print(f"\n  Source agents done: {succeeded} succeeded, {failed} failed")
 PYEOF
 
-ACTIVE_SOURCES=$(python3 "$LAUNCH_SCRIPT" "$MANIFEST")
-rm -f "$LAUNCH_SCRIPT"
-
-while IFS='|' read -r SAFE_NAME SOURCE_NAME ITEM_COUNT SOURCE_FILE; do
-    [ -z "$SAFE_NAME" ] && continue
-
-    AGENT_MSG="Today is ${TODAY}. Run type: ${TYPE}. You are analyzing ${SOURCE_NAME} (${ITEM_COUNT} items).
-
-1. Read the data file at ${SOURCE_FILE}
-2. Search memory for recent trends from ${SOURCE_NAME}: memory_search(\"${SOURCE_NAME} trends\")
-3. For each item, determine:
-   - Is this NEW (not in memory) or CONTINUING (was in memory)?
-   - Momentum: rising (growing engagement), falling (declining), stable, new (first appearance), viral (>10x growth)
-   - Why is it trending? (use description + context, 1 web_search max if unclear)
-4. Return ONLY a JSON object (no markdown, no explanation):
-{
-  \"source\": \"${SOURCE_NAME}\",
-  \"trends\": [
-    {
-      \"title\": \"...\",
-      \"description\": \"1-2 sentence factual summary\",
-      \"why_trending\": \"Why this is trending right now\",
-      \"momentum\": \"rising|falling|stable|new|viral\",
-      \"popularity\": {\"score\": 0-100, \"metric\": \"raw numbers from data\", \"reach\": \"high|medium|low\"},
-      \"urls\": [\"...\"],
-      \"first_seen\": \"ISO date or null\",
-      \"relevance\": \"high|medium|low\"
-    }
-  ]
-}"
-
-    # Run agent sequentially (OpenClaw session files lock per-agent, can't parallelize)
-    echo -n "  → $SOURCE_NAME ($ITEM_COUNT items)..."
-    AGENT_COUNT=$((AGENT_COUNT + 1))
-
-    if openclaw agent \
-            --agent source \
-            --session-id "source-${SAFE_NAME}" \
-            --json \
-            --timeout 45 \
-            --message "$AGENT_MSG" \
-            > "$AGENT_OUT_DIR/${SAFE_NAME}.json" 2>"$AGENT_OUT_DIR/${SAFE_NAME}.err"; then
-        echo " done ($(wc -c < "$AGENT_OUT_DIR/${SAFE_NAME}.json")b)"
-    else
-        AGENT_FAILURES=$((AGENT_FAILURES + 1))
-        echo " FAILED"
-    fi
-
-done <<< "$ACTIVE_SOURCES"
-
-AGENT_SUCCESS=$((AGENT_COUNT - AGENT_FAILURES))
-echo "[$(date -u +%H:%M:%S)] Source agents done: $AGENT_SUCCESS succeeded, $AGENT_FAILURES failed"
+python3 "$SOURCE_AGENT_SCRIPT" "$TMP_DIR/_manifest.json" "$AGENT_OUT_DIR" "$TODAY" "$TYPE"
+rm -f "$SOURCE_AGENT_SCRIPT"
 
 # ─── Step 4: Aggregate source agent outputs + summary agent ───────────────────
 echo "[$(date -u +%H:%M:%S)] Aggregating results..."
