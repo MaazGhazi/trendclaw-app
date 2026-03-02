@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useCallback, useState, useEffect } from "react";
 import { useTrends, useProgress, useHistory, useRunTrigger } from "@/lib/hooks";
 import DashboardHeader from "@/components/DashboardHeader";
 import SystemHealthStrip from "@/components/SystemHealthStrip";
@@ -10,12 +9,31 @@ import TrendsTab from "@/components/tabs/TrendsTab";
 import PipelineTab from "@/components/tabs/PipelineTab";
 import HistoryTab from "@/components/tabs/HistoryTab";
 
-export default function Home() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+function getInitialTab(): TabId {
+  if (typeof window === "undefined") return "trends";
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  if (tab === "trends" || tab === "pipeline" || tab === "history") return tab;
+  return "trends";
+}
 
-  const activeTab = (searchParams.get("tab") as TabId) || "trends";
-  const viewFile = searchParams.get("file");
+function getInitialFile(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("file");
+}
+
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<TabId>(getInitialTab);
+  const [viewFile, setViewFile] = useState<string | null>(getInitialFile);
+
+  // Sync tab to URL without router.push (just replaceState)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("tab", activeTab);
+    if (viewFile) params.set("file", viewFile);
+    const url = `/?${params.toString()}`;
+    window.history.replaceState(null, "", url);
+  }, [activeTab, viewFile]);
 
   // Shared data hooks
   const latestTrends = useTrends();
@@ -32,28 +50,19 @@ export default function Home() {
   const { runningType, message: runMessage, trigger } = useRunTrigger(onRunStarted);
 
   // Navigation helpers
-  const setTab = useCallback(
-    (tab: TabId) => {
-      const params = new URLSearchParams();
-      params.set("tab", tab);
-      router.push(`/?${params.toString()}`);
-    },
-    [router]
-  );
+  const setTab = useCallback((tab: TabId) => {
+    setActiveTab(tab);
+    if (tab !== "trends") setViewFile(null);
+  }, []);
 
-  const viewRun = useCallback(
-    (file: string) => {
-      const params = new URLSearchParams();
-      params.set("tab", "trends");
-      params.set("file", file);
-      router.push(`/?${params.toString()}`);
-    },
-    [router]
-  );
+  const viewRun = useCallback((file: string) => {
+    setViewFile(file);
+    setActiveTab("trends");
+  }, []);
 
   const backToLatest = useCallback(() => {
-    router.push("/?tab=trends");
-  }, [router]);
+    setViewFile(null);
+  }, []);
 
   return (
     <main className="max-w-7xl mx-auto px-4 py-6">
