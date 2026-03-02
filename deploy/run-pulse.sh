@@ -84,8 +84,8 @@ echo "[$(date -u +%H:%M:%S)] Split: $SPLIT_RESULT"
 echo "[$(date -u +%H:%M:%S)] Launching per-source agents..."
 
 TODAY=$(date -u +%Y-%m-%d)
-AGENT_PIDS=()
-AGENT_SOURCES=()
+AGENT_COUNT=0
+AGENT_FAILURES=0
 
 # Read manifest
 MANIFEST="$TMP_DIR/_manifest.json"
@@ -133,35 +133,26 @@ while IFS='|' read -r SAFE_NAME SOURCE_NAME ITEM_COUNT SOURCE_FILE; do
   ]
 }"
 
-    # Launch agent in background, capture output to file
-    (
-        openclaw agent \
+    # Run agent sequentially (OpenClaw session files lock per-agent, can't parallelize)
+    echo -n "  → $SOURCE_NAME ($ITEM_COUNT items)..."
+    AGENT_COUNT=$((AGENT_COUNT + 1))
+
+    if openclaw agent \
             --agent source \
             --session-id "source-${SAFE_NAME}" \
             --json \
             --timeout 45 \
             --message "$AGENT_MSG" \
-            > "$AGENT_OUT_DIR/${SAFE_NAME}.json" 2>"$AGENT_OUT_DIR/${SAFE_NAME}.err"
-    ) &
-
-    AGENT_PIDS+=($!)
-    AGENT_SOURCES+=("$SAFE_NAME")
-    echo "  → Launched agent for $SOURCE_NAME ($ITEM_COUNT items) [PID $!]"
+            > "$AGENT_OUT_DIR/${SAFE_NAME}.json" 2>"$AGENT_OUT_DIR/${SAFE_NAME}.err"; then
+        echo " done ($(wc -c < "$AGENT_OUT_DIR/${SAFE_NAME}.json")b)"
+    else
+        AGENT_FAILURES=$((AGENT_FAILURES + 1))
+        echo " FAILED"
+    fi
 
 done <<< "$ACTIVE_SOURCES"
 
-echo "[$(date -u +%H:%M:%S)] Waiting for ${#AGENT_PIDS[@]} source agents..."
-
-# Wait for all agents (don't fail if one dies)
-AGENT_FAILURES=0
-for i in "${!AGENT_PIDS[@]}"; do
-    if ! wait "${AGENT_PIDS[$i]}" 2>/dev/null; then
-        echo "  ✗ Agent ${AGENT_SOURCES[$i]} failed (exit code $?)"
-        AGENT_FAILURES=$((AGENT_FAILURES + 1))
-    fi
-done
-
-AGENT_SUCCESS=$(( ${#AGENT_PIDS[@]} - AGENT_FAILURES ))
+AGENT_SUCCESS=$((AGENT_COUNT - AGENT_FAILURES))
 echo "[$(date -u +%H:%M:%S)] Source agents done: $AGENT_SUCCESS succeeded, $AGENT_FAILURES failed"
 
 # ─── Step 4: Aggregate source agent outputs + summary agent ───────────────────
