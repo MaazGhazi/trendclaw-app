@@ -523,42 +523,81 @@ python3 "$AGG_SCRIPT" "$TYPE" "$DATA_FILE" "$AGENT_OUT_DIR" "$TMP_DIR"
 rm -f "$AGG_SCRIPT"
 # Preliminary output is now at $TMP_DIR/_preliminary.json
 
-# ─── Step 5: Summary agent call ───────────────────────────────────────────────
+# ─── Step 5: Summary agent call (direct OpenAI gpt-4o) ────────────────────────
 echo ""
 echo "[$(date -u +%H:%M:%S)] Running summary agent..."
 
 ENRICHED_FILE="$TMP_DIR/_enriched_all.json"
-ENRICHED_COUNT=$(python3 -c "import json; print(len(json.load(open('$ENRICHED_FILE'))))" 2>/dev/null || echo "0")
-YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d 2>/dev/null || echo "yesterday")
+SUMMARY_OUT="$AGENT_OUT_DIR/_summary.json"
 
-SUMMARY_MSG="Today is ${TODAY}. Run type: ${TYPE}. You are the TrendClaw summary agent.
+SUMMARY_SCRIPT=$(mktemp /tmp/trendclaw-summary-XXXXXX.py)
+cat > "$SUMMARY_SCRIPT" << 'PYEOF'
+import sys, json, os, time
+from urllib.request import Request, urlopen
 
-Here are ${ENRICHED_COUNT} enriched trends from multiple sources (already analyzed by source agents).
-Read the file at ${ENRICHED_FILE} to see all trends.
+enriched_file = sys.argv[1]
+summary_out = sys.argv[2]
+today = sys.argv[3]
+run_type = sys.argv[4]
+api_key = os.environ.get('OPENAI_API_KEY', '')
+
+with open(enriched_file) as f:
+    enriched = json.load(f)
+
+prompt = f"""Today is {today}. Run type: {run_type}. You are the TrendClaw summary agent.
+
+Here are {len(enriched)} enriched trends from multiple sources (already analyzed by source agents):
+
+{json.dumps(enriched, indent=1)}
 
 Your job:
-1. Search memory for yesterday's summary: memory_search(\"summary ${YESTERDAY}\")
-2. Cross-reference: find trends that appear across multiple sources and merge them
-3. Generate top_movers (top 5 by significance, noting direction)
-4. Generate signals: emerging (new this run, not in memory) and fading (in memory but gone now)
-5. Write a 3-5 sentence executive summary
+1. Cross-reference: find trends that appear across multiple sources and merge them
+2. Generate top_movers (top 5 by significance, noting direction)
+3. Generate signals: emerging (notable new trends) and fading (if any seem to be losing steam)
+4. Write a 3-5 sentence executive summary
 
-Return ONLY a JSON object (no markdown, no explanation):
-{
-  \"top_movers\": [{\"title\": \"...\", \"direction\": \"up|down|new\", \"delta\": \"brief description of change\"}],
-  \"signals\": {\"emerging\": [\"...\"], \"fading\": [\"...\"]},
-  \"summary\": \"3-5 sentence executive summary\"
-}"
+Return ONLY a JSON object:
+{{
+  "top_movers": [{{"title": "...", "direction": "up|down|new", "delta": "brief description"}}],
+  "signals": {{"emerging": ["..."], "fading": ["..."]}},
+  "summary": "3-5 sentence executive summary"
+}}"""
 
-SUMMARY_OUT="$AGENT_OUT_DIR/_summary.json"
-SUMMARY_ERR="$AGENT_OUT_DIR/_summary.err"
+body = json.dumps({
+    "model": "gpt-4o",
+    "messages": [
+        {"role": "system", "content": "You are a trend intelligence analyst. Return ONLY valid JSON, no markdown fences."},
+        {"role": "user", "content": prompt}
+    ],
+    "temperature": 0.3,
+    "response_format": {"type": "json_object"}
+}).encode()
 
-openclaw agent \
-    --session-id "summary-${TYPE}" \
-    --json \
-    --timeout 60 \
-    --message "$SUMMARY_MSG" \
-    > "$SUMMARY_OUT" 2>"$SUMMARY_ERR" || true
+req = Request(
+    "https://api.openai.com/v1/chat/completions",
+    data=body,
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+)
+
+try:
+    start = time.time()
+    resp = urlopen(req, timeout=60)
+    result = json.loads(resp.read().decode())
+    content = result['choices'][0]['message']['content']
+    elapsed = time.time() - start
+
+    with open(summary_out, 'w') as f:
+        f.write(content)
+    print(f"  ✓ Summary agent: {len(content)}b ({elapsed:.1f}s)")
+except Exception as e:
+    print(f"  ✗ Summary agent failed: {str(e)[:120]}")
+PYEOF
+
+python3 "$SUMMARY_SCRIPT" "$ENRICHED_FILE" "$SUMMARY_OUT" "$TODAY" "$TYPE"
+rm -f "$SUMMARY_SCRIPT"
 
 # ─── Step 6: Merge summary into final output ──────────────────────────────────
 echo "[$(date -u +%H:%M:%S)] Merging summary..."
