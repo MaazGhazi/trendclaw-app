@@ -39,6 +39,24 @@
         }
       },
 
+      "memorySearch": {
+        "enabled": true,
+        "provider": "openai",
+        "model": "text-embedding-3-small",
+        "sources": ["memory"],
+        "sync": { "onSessionStart": true, "onSearch": true, "watch": true },
+        "query": {
+          "maxResults": 8,
+          "minScore": 0.3,
+          "hybrid": {
+            "enabled": true,
+            "vectorWeight": 0.7,
+            "textWeight": 0.3,
+            "temporalDecay": { "enabled": true, "halfLifeDays": 30 }
+          }
+        }
+      },
+
       "timeoutSeconds": 600
     }
   },
