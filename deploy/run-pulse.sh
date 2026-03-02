@@ -74,12 +74,13 @@ def build_metric(item):
             parts.append(f"{s} stars")
         extra = item.get('extra', {})
         if extra.get('todayStars'):
-            parts.append(f"+{extra['todayStars']} today")
+            ts = str(extra['todayStars']).replace(' stars today', '').replace(' today', '')
+            parts.append(f"+{ts} today")
     if item.get('priceChange'):
         parts.append(item['priceChange'])
-    if item.get('volume'):
+    if item.get('volume') and str(item['volume']) != 'undefined':
         parts.append(f"vol {item['volume']}")
-    if item.get('marketCap'):
+    if item.get('marketCap') and str(item['marketCap']) != 'undefined':
         parts.append(f"mcap {item['marketCap']}")
     if item.get('rank'):
         parts.append(f"#{item['rank']}")
@@ -155,6 +156,12 @@ for src in sources:
         momentum = derive_momentum(item)
         metric = build_metric(item)
 
+        # Handle URL as string or RSS object {"@_href": "..."}
+        raw_url = item.get('url', '')
+        if isinstance(raw_url, dict):
+            raw_url = raw_url.get('@_href', raw_url.get('href', ''))
+        urls = [raw_url] if raw_url and isinstance(raw_url, str) else []
+
         trend = {
             'title': title,
             'description': item.get('description', '') or '',
@@ -162,7 +169,7 @@ for src in sources:
             'momentum': momentum,
             'popularity': {'score': score, 'metric': metric, 'reach': reach},
             'sources': [name],
-            'urls': [item['url']] if item.get('url') else [],
+            'urls': urls,
             'first_seen': item.get('publishedAt', None),
             'relevance': 'high' if score >= 70 else 'medium' if score >= 40 else 'low'
         }
