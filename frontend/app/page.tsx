@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import CategorySection from "@/components/CategorySection";
 import DataQuality from "@/components/DataQuality";
 import TopMovers from "@/components/TopMovers";
@@ -86,6 +87,12 @@ export default function Home() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href="/progress"
+            className="text-xs px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-md text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            Pipeline Status
+          </Link>
           <span className="text-[10px] text-zinc-600">
             refreshed {lastRefresh.toLocaleTimeString()}
           </span>

@@ -17,17 +17,85 @@ GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
 MEMORY_DIR="$HOME/.openclaw/workspace/memory"
 TMP_DIR="/tmp/trendclaw-sources"
 AGENT_OUT_DIR="/tmp/trendclaw-agent-out"
+FRONTEND_DIR="$HOME/trendclaw-app/frontend"
+PROGRESS_FILE="$FRONTEND_DIR/data/progress.json"
+RUN_ID="${TYPE}-$(date +%s)"
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# ─── Progress tracking ────────────────────────────────────────────────────────
+mkdir -p "$(dirname "$PROGRESS_FILE")"
+
+write_progress() {
+  # Usage: write_progress <python_update_expression>
+  # The expression has access to 'p' (the progress dict) and should modify it in place.
+  local update_expr="$1"
+  python3 -c "
+import json, os
+pf = '$PROGRESS_FILE'
+try:
+    with open(pf) as f:
+        p = json.load(f)
+except:
+    p = {
+        'run_id': '$RUN_ID',
+        'type': '$TYPE',
+        'started_at': '$STARTED_AT',
+        'status': 'running',
+        'steps': {
+            'scraper': {'status': 'pending'},
+            'split': {'status': 'pending'},
+            'agents': {'status': 'pending'},
+            'aggregation': {'status': 'pending'},
+            'summary': {'status': 'pending'},
+            'memory': {'status': 'pending'},
+            'webhook': {'status': 'pending'}
+        }
+    }
+$update_expr
+with open(pf, 'w') as f:
+    json.dump(p, f)
+" 2>/dev/null || true
+}
 
 echo "[$(date -u +%H:%M:%S)] TrendClaw $TYPE run starting (agent pipeline)"
+
+# Write initial progress
+write_progress "p['steps']['scraper']['status'] = 'running'"
+
+SCRAPER_START=$(date +%s)
 
 # ─── Step 1: Run scraper ───────────────────────────────────────────────────────
 echo "[$(date -u +%H:%M:%S)] Running scraper..."
 cd "$SCRAPER_DIR"
 node dist/index.js --type "$TYPE" 2>&1 || echo "WARNING: scraper had errors"
 
+SCRAPER_ELAPSED=$(($(date +%s) - SCRAPER_START))
+
 DEBUG_DIR="$HOME/trendclaw-app/debug"
 mkdir -p "$DEBUG_DIR"
 cp "$DATA_FILE" "$DEBUG_DIR/scraper-${TYPE}-$(date +%s).json" 2>/dev/null || true
+
+# Count items from scraper output for progress detail
+SCRAPER_DETAIL=$(python3 -c "
+import json
+try:
+    with open('$DATA_FILE') as f:
+        d = json.load(f)
+    sources = [s for s in d.get('sources', []) if s.get('status') == 'ok']
+    items = sum(len(s.get('items', [])) for s in sources)
+    print(f'{items} items from {len(sources)} sources')
+except:
+    print('done')
+" 2>/dev/null || echo "done")
+
+write_progress "
+p['steps']['scraper']['status'] = 'completed'
+p['steps']['scraper']['duration_s'] = $SCRAPER_ELAPSED
+p['steps']['scraper']['detail'] = '$SCRAPER_DETAIL'
+p['steps']['split']['status'] = 'running'
+"
+
+SPLIT_START=$(date +%s)
 
 # ─── Step 2: Split scraper output into per-source temp files ───────────────────
 echo "[$(date -u +%H:%M:%S)] Splitting sources..."
@@ -80,6 +148,30 @@ SPLIT_RESULT=$(python3 "$SPLIT_SCRIPT" "$DATA_FILE" "$TMP_DIR" 2>&1)
 rm -f "$SPLIT_SCRIPT"
 echo "[$(date -u +%H:%M:%S)] Split: $SPLIT_RESULT"
 
+SPLIT_ELAPSED=$(($(date +%s) - SPLIT_START))
+
+# Build agents source list for progress from manifest
+python3 -c "
+import json
+pf = '$PROGRESS_FILE'
+mf = '$TMP_DIR/_manifest.json'
+with open(pf) as f:
+    p = json.load(f)
+with open(mf) as f:
+    manifest = json.load(f)
+p['steps']['split']['status'] = 'completed'
+p['steps']['split']['duration_s'] = $SPLIT_ELAPSED
+active = [s for s in manifest if s.get('file')]
+p['steps']['split']['detail'] = f'{len(active)} active sources'
+p['steps']['agents']['status'] = 'running'
+p['steps']['agents']['sources'] = [
+    {'name': s['name'], 'status': 'pending', 'items': s['items']}
+    for s in active
+]
+with open(pf, 'w') as f:
+    json.dump(p, f)
+" 2>/dev/null || true
+
 # ─── Step 3: Parallel per-source agent calls (direct OpenAI API) ───────────────
 echo "[$(date -u +%H:%M:%S)] Launching per-source agents (parallel)..."
 
@@ -87,7 +179,7 @@ TODAY=$(date -u +%Y-%m-%d)
 
 SOURCE_AGENT_SCRIPT=$(mktemp /tmp/trendclaw-agents-XXXXXX.py)
 cat > "$SOURCE_AGENT_SCRIPT" << 'PYEOF'
-import sys, json, os, time
+import sys, json, os, time, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.request import Request, urlopen
 from urllib.error import URLError
@@ -96,7 +188,30 @@ manifest_file = sys.argv[1]
 agent_out_dir = sys.argv[2]
 today = sys.argv[3]
 run_type = sys.argv[4]
+progress_file = sys.argv[5]
 api_key = os.environ.get('OPENAI_API_KEY', '')
+
+progress_lock = threading.Lock()
+
+def update_source_progress(source_name, status, duration_s=None, size_b=None):
+    """Update a single source's status in the progress file."""
+    try:
+        with progress_lock:
+            with open(progress_file) as f:
+                p = json.load(f)
+            sources = p.get('steps', {}).get('agents', {}).get('sources', [])
+            for src in sources:
+                if src['name'] == source_name:
+                    src['status'] = status
+                    if duration_s is not None:
+                        src['duration_s'] = round(duration_s, 1)
+                    if size_b is not None:
+                        src['size_b'] = size_b
+                    break
+            with open(progress_file, 'w') as f:
+                json.dump(p, f)
+    except:
+        pass
 
 with open(manifest_file) as f:
     manifest = json.load(f)
@@ -105,6 +220,7 @@ active = [s for s in manifest if s.get('file')]
 
 def call_openai(source_name, safe_name, item_count, source_file):
     """Call OpenAI gpt-4o-mini for a single source."""
+    update_source_progress(source_name, 'running')
     with open(source_file) as f:
         source_data = json.dumps(json.load(f))
 
@@ -185,10 +301,12 @@ with ThreadPoolExecutor(max_workers=10) as pool:
             safe, name, size, elapsed = fut.result()
             succeeded += 1
             print(f"  ✓ {name}: {size}b ({elapsed:.1f}s)")
+            update_source_progress(name, 'completed', duration_s=elapsed, size_b=size)
         except Exception as e:
             failed += 1
             err_str = str(e)
             print(f"  ✗ {src['name']}: {err_str[:120]}")
+            update_source_progress(src['name'], 'failed')
             # Write error to err file
             err_file = os.path.join(agent_out_dir, f"{src['safe_name']}.err")
             with open(err_file, 'w') as ef:
@@ -197,8 +315,18 @@ with ThreadPoolExecutor(max_workers=10) as pool:
 print(f"\n  Source agents done: {succeeded} succeeded, {failed} failed")
 PYEOF
 
-python3 "$SOURCE_AGENT_SCRIPT" "$TMP_DIR/_manifest.json" "$AGENT_OUT_DIR" "$TODAY" "$TYPE"
+AGENTS_START=$(date +%s)
+python3 "$SOURCE_AGENT_SCRIPT" "$TMP_DIR/_manifest.json" "$AGENT_OUT_DIR" "$TODAY" "$TYPE" "$PROGRESS_FILE"
 rm -f "$SOURCE_AGENT_SCRIPT"
+AGENTS_ELAPSED=$(($(date +%s) - AGENTS_START))
+
+write_progress "
+p['steps']['agents']['status'] = 'completed'
+p['steps']['agents']['duration_s'] = $AGENTS_ELAPSED
+p['steps']['aggregation']['status'] = 'running'
+"
+
+AGG_START=$(date +%s)
 
 # ─── Step 4: Aggregate source agent outputs + summary agent ───────────────────
 echo "[$(date -u +%H:%M:%S)] Aggregating results..."
@@ -523,6 +651,29 @@ python3 "$AGG_SCRIPT" "$TYPE" "$DATA_FILE" "$AGENT_OUT_DIR" "$TMP_DIR"
 rm -f "$AGG_SCRIPT"
 # Preliminary output is now at $TMP_DIR/_preliminary.json
 
+AGG_ELAPSED=$(($(date +%s) - AGG_START))
+
+# Read aggregation detail from preliminary output
+AGG_DETAIL=$(python3 -c "
+import json
+try:
+    with open('$TMP_DIR/_preliminary.json') as f:
+        o = json.load(f)
+    dq = o.get('data_quality', {})
+    print(f\"{dq.get('agent_enriched', 0)} agent-enriched, {dq.get('fallback_used', 0)} fallback\")
+except:
+    print('done')
+" 2>/dev/null || echo "done")
+
+write_progress "
+p['steps']['aggregation']['status'] = 'completed'
+p['steps']['aggregation']['duration_s'] = $AGG_ELAPSED
+p['steps']['aggregation']['detail'] = '$AGG_DETAIL'
+p['steps']['summary']['status'] = 'running'
+"
+
+SUMMARY_START=$(date +%s)
+
 # ─── Step 5: Summary agent call (direct OpenAI gpt-4o) ────────────────────────
 echo ""
 echo "[$(date -u +%H:%M:%S)] Running summary agent..."
@@ -598,6 +749,14 @@ PYEOF
 
 python3 "$SUMMARY_SCRIPT" "$ENRICHED_FILE" "$SUMMARY_OUT" "$TODAY" "$TYPE"
 rm -f "$SUMMARY_SCRIPT"
+
+SUMMARY_ELAPSED=$(($(date +%s) - SUMMARY_START))
+
+write_progress "
+p['steps']['summary']['status'] = 'completed'
+p['steps']['summary']['duration_s'] = $SUMMARY_ELAPSED
+p['steps']['memory']['status'] = 'running'
+"
 
 # ─── Step 6: Merge summary into final output ──────────────────────────────────
 echo "[$(date -u +%H:%M:%S)] Merging summary..."
@@ -743,6 +902,14 @@ rm -f "$MERGE_SCRIPT"
 
 FINAL_FILE="$TMP_DIR/_final.json"
 
+# Read memory file path for progress detail
+TODAY_DATE=$(date -u +%Y-%m-%d)
+write_progress "
+p['steps']['memory']['status'] = 'completed'
+p['steps']['memory']['detail'] = '${TODAY_DATE}.md'
+p['steps']['webhook']['status'] = 'running'
+"
+
 # ─── Step 7: POST to webhook ──────────────────────────────────────────────────
 echo ""
 echo "[$(date -u +%H:%M:%S)] Posting to webhook..."
@@ -764,8 +931,18 @@ rm -f "$POSTFILE"
 
 if [ "$HTTP_CODE" = "201" ]; then
   echo "[$(date -u +%H:%M:%S)] Success! Delivered to frontend (HTTP $HTTP_CODE)"
+  write_progress "
+p['steps']['webhook']['status'] = 'completed'
+p['steps']['webhook']['detail'] = 'HTTP $HTTP_CODE'
+p['status'] = 'completed'
+"
 else
   echo "[$(date -u +%H:%M:%S)] WARNING: Webhook returned HTTP $HTTP_CODE"
+  write_progress "
+p['steps']['webhook']['status'] = 'failed'
+p['steps']['webhook']['detail'] = 'HTTP $HTTP_CODE'
+p['status'] = 'failed'
+"
 fi
 
 # Cleanup temp files (keep for debugging until stable)
