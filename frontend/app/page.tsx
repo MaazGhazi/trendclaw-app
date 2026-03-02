@@ -45,26 +45,32 @@ export default function Home() {
   const [error, setError] = useState<string>("");
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [runningType, setRunningType] = useState<string | null>(null);
+  const [runMessage, setRunMessage] = useState<string>("");
 
   const triggerRun = async (type: string) => {
     setRunningType(type);
+    setRunMessage("");
     try {
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type }),
       });
+      const json = await res.json();
       if (res.status === 409) {
-        alert("A pipeline is already running. Check Pipeline Status.");
+        setRunMessage("A pipeline is already running.");
       } else if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to start pipeline");
+        setRunMessage(json.error || "Failed to start pipeline");
+      } else {
+        setRunMessage(`${typeLabels[type] || type} started!`);
       }
     } catch {
-      alert("Connection error");
+      setRunMessage("Connection error");
     }
-    // Brief delay so user sees the spinner, then clear
-    setTimeout(() => setRunningType(null), 2000);
+    setTimeout(() => {
+      setRunningType(null);
+      setRunMessage("");
+    }, 3000);
   };
 
   const fetchTrends = useCallback(async () => {
@@ -154,6 +160,9 @@ export default function Home() {
               )}
             </button>
           ))}
+          {runMessage && (
+            <span className="text-xs text-zinc-400 ml-2">{runMessage}</span>
+          )}
         </div>
       </header>
 

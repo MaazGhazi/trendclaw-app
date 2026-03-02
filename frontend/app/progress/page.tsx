@@ -153,30 +153,37 @@ export default function ProgressPage() {
   const [error, setError] = useState<string>("");
   const [elapsed, setElapsed] = useState<string>("");
   const [runningType, setRunningType] = useState<string | null>(null);
+  const [runMessage, setRunMessage] = useState<string>("");
 
   const triggerRun = async (type: string) => {
     setRunningType(type);
+    setRunMessage("");
     try {
       const res = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type }),
       });
+      const json = await res.json();
       if (res.status === 409) {
+        setRunMessage("Already running");
         setRunningType(null);
-        return; // already running, the UI will show it
+        return;
       }
       if (!res.ok) {
-        const json = await res.json();
-        alert(json.error || "Failed to start pipeline");
+        setRunMessage(json.error || "Failed to start");
         setRunningType(null);
+        return;
       }
+      setRunMessage("Started!");
     } catch {
-      alert("Connection error");
+      setRunMessage("Connection error");
       setRunningType(null);
     }
-    // Clear after a brief moment — the polling will pick up the new run
-    setTimeout(() => setRunningType(null), 2000);
+    setTimeout(() => {
+      setRunningType(null);
+      setRunMessage("");
+    }, 3000);
   };
 
   const fetchProgress = useCallback(async () => {
@@ -283,6 +290,9 @@ export default function ProgressPage() {
               )}
             </button>
           ))}
+          {runMessage && (
+            <span className="text-xs text-zinc-400 ml-2">{runMessage}</span>
+          )}
         </div>
       )}
 
