@@ -14,7 +14,7 @@ function ensureDataDir() {
 function pruneOldFiles() {
   const files = fs
     .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".json") && f !== "progress.json")
+    .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run"))
     .sort()
     .reverse();
 
@@ -29,7 +29,7 @@ function getLatestFile(): string | null {
   ensureDataDir();
   const files = fs
     .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".json") && f !== "progress.json")
+    .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run"))
     .sort((a, b) => {
       const aStat = fs.statSync(path.join(DATA_DIR, a));
       const bStat = fs.statSync(path.join(DATA_DIR, b));
