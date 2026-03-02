@@ -152,6 +152,32 @@ export default function ProgressPage() {
   const [data, setData] = useState<ProgressData | null>(null);
   const [error, setError] = useState<string>("");
   const [elapsed, setElapsed] = useState<string>("");
+  const [runningType, setRunningType] = useState<string | null>(null);
+
+  const triggerRun = async (type: string) => {
+    setRunningType(type);
+    try {
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      if (res.status === 409) {
+        setRunningType(null);
+        return; // already running, the UI will show it
+      }
+      if (!res.ok) {
+        const json = await res.json();
+        alert(json.error || "Failed to start pipeline");
+        setRunningType(null);
+      }
+    } catch {
+      alert("Connection error");
+      setRunningType(null);
+    }
+    // Clear after a brief moment — the polling will pick up the new run
+    setTimeout(() => setRunningType(null), 2000);
+  };
 
   const fetchProgress = useCallback(async () => {
     try {
@@ -230,12 +256,42 @@ export default function ProgressPage() {
         )}
       </header>
 
+      {/* Run buttons */}
+      {(!data || data.status !== "running") && (
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-xs text-zinc-600 mr-1">Run:</span>
+          {(["pulse", "digest", "deep_dive"] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => triggerRun(type)}
+              disabled={runningType !== null}
+              className={`text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                type === "pulse"
+                  ? "bg-blue-950/50 hover:bg-blue-900/50 border-blue-800/50 text-blue-300"
+                  : type === "digest"
+                    ? "bg-purple-950/50 hover:bg-purple-900/50 border-purple-800/50 text-purple-300"
+                    : "bg-amber-950/50 hover:bg-amber-900/50 border-amber-800/50 text-amber-300"
+              }`}
+            >
+              {runningType === type ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
+                  Starting...
+                </span>
+              ) : (
+                typeLabels[type]
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Error / Empty */}
       {error && !data && (
         <div className="text-center py-20">
           <p className="text-zinc-500 text-sm">{error}</p>
           <p className="text-zinc-600 text-xs mt-2">
-            Progress data appears when the pipeline runs.
+            Click a button above to start a pipeline run.
           </p>
           <Link
             href="/"
