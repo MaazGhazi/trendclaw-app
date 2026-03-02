@@ -43,7 +43,8 @@ Return 15-25 trends with full analysis.
 IMPORTANT: Return ONLY valid JSON matching the trend_monitor output schema. No markdown, no explanation, just the JSON object."
 fi
 
-RESULT=$(openclaw agent --local --model "$MODEL" --message "$MSG" --json --timeout 120 2>&1 || true)
+SESSION_ID="trendclaw-${TYPE}-$(date +%s)"
+RESULT=$(openclaw agent --session-id "$SESSION_ID" --message "$MSG" --json --timeout 120 2>&1 || true)
 
 # Extract the agent's text response (try to find JSON in it)
 AGENT_OUTPUT=$(echo "$RESULT" | python3 -c "
