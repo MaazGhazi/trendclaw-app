@@ -155,7 +155,7 @@ Return ONLY a JSON object:
     )
 
     start = time.time()
-    resp = urlopen(req, timeout=45)
+    resp = urlopen(req, timeout=60)
     result = json.loads(resp.read().decode())
     content = result['choices'][0]['message']['content']
     elapsed = time.time() - start
