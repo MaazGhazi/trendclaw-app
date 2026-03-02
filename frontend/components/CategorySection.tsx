@@ -35,7 +35,7 @@ export default function CategorySection({ category }: { category: Category }) {
       >
         {category.name}
         <span className="text-sm font-normal text-zinc-500 ml-2">
-          {category.trends.length} trends
+          {category.trends.length} {category.trends.length === 1 ? 'trend' : 'trends'}
         </span>
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">

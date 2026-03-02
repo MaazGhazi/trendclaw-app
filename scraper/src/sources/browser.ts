@@ -20,7 +20,7 @@ export async function getBrowser(): Promise<BrowserContext> {
 
   context = await browser.newContext({
     userAgent:
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
     viewport: { width: 1440, height: 900 },
     locale: "en-US",
     timezoneId: "America/New_York",
@@ -45,6 +45,19 @@ export async function getBrowser(): Promise<BrowserContext> {
 
     // Fake chrome runtime
     (window as any).chrome = { runtime: {} };
+
+    // WebGL vendor/renderer spoofing
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function (param: number) {
+      if (param === 0x9245) return "Intel Inc.";           // UNMASKED_VENDOR_WEBGL
+      if (param === 0x9246) return "Intel Iris OpenGL Engine"; // UNMASKED_RENDERER_WEBGL
+      return getParameter.call(this, param);
+    };
+
+    // navigator.connection spoofing
+    Object.defineProperty(navigator, "connection", {
+      get: () => ({ effectiveType: "4g", rtt: 50, downlink: 10, saveData: false }),
+    });
 
     // Fake permissions
     const originalQuery = window.navigator.permissions?.query;
