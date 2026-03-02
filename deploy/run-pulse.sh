@@ -129,6 +129,8 @@ try:
             metric_str = str(int(score))
         elif isinstance(pop_raw, dict):
             score = pop_raw.get('metric', pop_raw.get('score', 50))
+            if score is None:
+                score = 50
             if isinstance(score, str):
                 # e.g. "17.5%"
                 try: score = float(score.replace('%',''))
