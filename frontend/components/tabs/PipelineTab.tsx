@@ -141,7 +141,7 @@ export default function PipelineTab({
         <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
           Recent Runs
         </h2>
-        {recentRuns.length === 0 ? (
+        {recentRuns.filter((r) => !r.failed).length === 0 ? (
           <p className="text-xs text-zinc-600">No runs yet.</p>
         ) : (
           <div className="overflow-hidden rounded-lg border border-zinc-800">
@@ -150,48 +150,49 @@ export default function PipelineTab({
                 <tr className="bg-zinc-900/50">
                   <th className="text-left px-3 py-2 text-zinc-500 font-medium">Type</th>
                   <th className="text-left px-3 py-2 text-zinc-500 font-medium">Time</th>
-                  <th className="text-right px-3 py-2 text-zinc-500 font-medium">Items</th>
-                  <th className="text-right px-3 py-2 text-zinc-500 font-medium">Size</th>
+                  <th className="text-right px-3 py-2 text-zinc-500 font-medium">Trends</th>
+                  <th className="text-right px-3 py-2 text-zinc-500 font-medium">Sources</th>
                   <th className="text-right px-3 py-2 text-zinc-500 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {recentRuns.slice(0, 10).map((run) => (
-                  <tr
-                    key={run.file}
-                    className="hover:bg-zinc-800/30 transition-colors"
-                  >
-                    <td className="px-3 py-2">
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-medium ${TYPE_COLORS[run.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"}`}
-                      >
-                        {TYPE_LABELS[run.type] || run.type}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-zinc-400">
-                      {new Date(run.created).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-3 py-2 text-right text-zinc-400">
-                      {run.data_quality?.total_items ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right text-zinc-500">
-                      {(run.size / 1024).toFixed(1)}KB
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => onViewRun(run.file)}
-                        className="text-blue-400 hover:text-blue-300"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {recentRuns
+                  .filter((r) => !r.failed)
+                  .slice(0, 10)
+                  .map((run) => (
+                    <tr
+                      key={run.file}
+                      className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
+                      onClick={() => onViewRun(run.file)}
+                    >
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-medium ${TYPE_COLORS[run.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"}`}
+                        >
+                          {TYPE_LABELS[run.type] || run.type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-zinc-400">
+                        {new Date(run.created).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="px-3 py-2 text-right text-zinc-400">
+                        {run.data_quality?.trend_count ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right text-zinc-500">
+                        {run.data_quality?.sources_ok ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span className="text-blue-400 hover:text-blue-300">
+                          View
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

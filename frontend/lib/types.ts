@@ -69,9 +69,11 @@ export interface HistoryRun {
   type: string;
   size: number;
   created: string;
+  failed?: boolean;
   data_quality?: {
     sources_ok: number;
     total_items: number;
+    trend_count: number;
   };
 }
 

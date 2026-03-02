@@ -6,6 +6,16 @@ const DATA_DIR = path.join(process.cwd(), "data");
 
 const EXCLUDED_FILES = new Set(["progress.json", "run.lock"]);
 
+// Parse type and timestamp from filename like "deep_dive-2026-03-02T05-12-31-084Z.json"
+function parseFilename(f: string) {
+  const base = f.replace(".json", "");
+  // Type is everything before the first YYYY pattern
+  const match = base.match(/^(.+?)-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/);
+  if (!match) return { type: base.split("-")[0], timestamp: "" };
+  const [, type, y, mo, d, h, mi, s, ms] = match;
+  return { type, timestamp: `${y}-${mo}-${d}T${h}:${mi}:${s}.${ms}Z` };
+}
+
 export async function GET(request: NextRequest) {
   if (!fs.existsSync(DATA_DIR)) {
     return NextResponse.json({ runs: [] });
@@ -13,9 +23,7 @@ export async function GET(request: NextRequest) {
 
   const files = fs
     .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".json") && !EXCLUDED_FILES.has(f))
-    .sort()
-    .reverse();
+    .filter((f) => f.endsWith(".json") && !EXCLUDED_FILES.has(f));
 
   const fileParam = request.nextUrl.searchParams.get("file");
 
@@ -30,35 +38,48 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ file: safeName, data: JSON.parse(content) });
   }
 
-  // Otherwise return the list of runs with enriched data_quality
+  // Build enriched run list
   const runs = files.map((f) => {
     const filePath = path.join(DATA_DIR, f);
     const stat = fs.statSync(filePath);
-    const parts = f.replace(".json", "").split("-");
-    const type = parts[0];
+    const { type, timestamp } = parseFilename(f);
 
-    // Try to read data_quality from the file
-    let data_quality: { sources_ok: number; total_items: number } | undefined;
+    let data_quality: { sources_ok: number; total_items: number; trend_count: number } | undefined;
+    let failed = false;
     try {
       const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-      if (content.data_quality) {
-        data_quality = {
-          sources_ok: content.data_quality.sources_ok ?? 0,
-          total_items: content.data_quality.total_raw_items ?? 0,
-        };
-      }
+      const categories = content.categories || [];
+      const trendCount = categories.reduce(
+        (sum: number, cat: { trends?: unknown[] }) => sum + (cat.trends?.length || 0),
+        0
+      );
+      const sourcesOk = content.data_quality?.sources_ok ?? 0;
+      const totalItems = content.data_quality?.total_raw_items ?? 0;
+
+      data_quality = {
+        sources_ok: sourcesOk,
+        total_items: totalItems,
+        trend_count: trendCount,
+      };
+
+      // Mark as failed if parse error or zero trends with zero sources
+      failed = !!content.parse_error || (trendCount === 0 && sourcesOk === 0);
     } catch {
-      // skip enrichment if file can't be parsed
+      failed = true;
     }
 
     return {
       file: f,
       type,
       size: stat.size,
-      created: stat.birthtime.toISOString(),
+      created: timestamp || stat.birthtime.toISOString(),
       data_quality,
+      failed,
     };
   });
+
+  // Sort by timestamp descending (newest first)
+  runs.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
 
   return NextResponse.json({ runs });
 }

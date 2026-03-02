@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { HistoryRun } from "@/lib/types";
 import { TYPE_LABELS, TYPE_COLORS } from "@/lib/types";
+import { formatAge } from "@/lib/hooks";
 
 interface HistoryTabProps {
   runs: HistoryRun[];
@@ -17,11 +18,33 @@ const filterOptions = [
   { value: "deep_dive", label: "Deep Dive" },
 ];
 
+function formatTimestamp(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes}B`;
+  return `${(bytes / 1024).toFixed(0)}KB`;
+}
+
 export default function HistoryTab({ runs, loading, onViewRun }: HistoryTabProps) {
   const [filter, setFilter] = useState("all");
 
   const filtered =
     filter === "all" ? runs : runs.filter((r) => r.type === filter);
+
+  // Separate successful and failed runs
+  const successful = filtered.filter((r) => !r.failed);
+  const failedCount = filtered.filter((r) => r.failed).length;
+
+  const [showFailed, setShowFailed] = useState(false);
+  const displayed = showFailed ? filtered : successful;
 
   if (loading) {
     return (
@@ -34,7 +57,7 @@ export default function HistoryTab({ runs, loading, onViewRun }: HistoryTabProps
   return (
     <div>
       {/* Filter row */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         {filterOptions.map((opt) => (
           <button
             key={opt.value}
@@ -48,82 +71,92 @@ export default function HistoryTab({ runs, loading, onViewRun }: HistoryTabProps
             {opt.label}
           </button>
         ))}
-        <span className="text-xs text-zinc-600 ml-2">
-          {filtered.length} run{filtered.length !== 1 ? "s" : ""}
+        <span className="text-xs text-zinc-600 ml-auto">
+          {successful.length} successful run{successful.length !== 1 ? "s" : ""}
+          {failedCount > 0 && (
+            <button
+              onClick={() => setShowFailed(!showFailed)}
+              className="ml-2 text-zinc-500 hover:text-zinc-400 underline underline-offset-2"
+            >
+              {showFailed ? "hide" : "show"} {failedCount} failed
+            </button>
+          )}
         </span>
       </div>
 
-      {filtered.length === 0 ? (
+      {displayed.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-zinc-500 text-sm">No runs found.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-zinc-800">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-zinc-900/50">
-                <th className="text-left px-3 py-2 text-zinc-500 font-medium">
-                  Type
-                </th>
-                <th className="text-left px-3 py-2 text-zinc-500 font-medium">
-                  Timestamp
-                </th>
-                <th className="text-right px-3 py-2 text-zinc-500 font-medium">
-                  Items
-                </th>
-                <th className="text-right px-3 py-2 text-zinc-500 font-medium">
-                  Sources
-                </th>
-                <th className="text-right px-3 py-2 text-zinc-500 font-medium">
-                  Size
-                </th>
-                <th className="text-right px-3 py-2 text-zinc-500 font-medium">
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/50">
-              {filtered.map((run) => (
-                <tr
-                  key={run.file}
-                  className="hover:bg-zinc-800/30 transition-colors cursor-pointer"
-                  onClick={() => onViewRun(run.file)}
-                >
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-medium ${TYPE_COLORS[run.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"}`}
-                    >
-                      {TYPE_LABELS[run.type] || run.type}
+        <div className="space-y-2">
+          {displayed.map((run) => {
+            const dq = run.data_quality;
+            const isFailed = run.failed;
+
+            return (
+              <button
+                key={run.file}
+                onClick={() => !isFailed && onViewRun(run.file)}
+                disabled={isFailed}
+                className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                  isFailed
+                    ? "bg-zinc-900/30 border-zinc-800/50 opacity-50 cursor-not-allowed"
+                    : "bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 cursor-pointer"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Type badge */}
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded border text-[10px] font-medium shrink-0 ${
+                      TYPE_COLORS[run.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"
+                    }`}
+                  >
+                    {TYPE_LABELS[run.type] || run.type}
+                  </span>
+
+                  {/* Timestamp */}
+                  <span className="text-sm text-zinc-300">
+                    {formatTimestamp(run.created)}
+                  </span>
+
+                  {/* Relative time */}
+                  <span className="text-xs text-zinc-600">
+                    {formatAge(run.created)}
+                  </span>
+
+                  {/* Failed badge */}
+                  {isFailed && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-950/50 text-red-400 border border-red-900/50">
+                      Failed
                     </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-zinc-400">
-                    {new Date(run.created).toLocaleString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-zinc-400">
-                    {run.data_quality?.total_items ?? "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-zinc-400">
-                    {run.data_quality?.sources_ok != null
-                      ? `${run.data_quality.sources_ok} OK`
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-zinc-500">
-                    {(run.size / 1024).toFixed(1)}KB
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <span className="text-blue-400 hover:text-blue-300">
-                      View
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  )}
+
+                  {/* Stats (right side) */}
+                  <div className="ml-auto flex items-center gap-4 text-xs">
+                    {!isFailed && dq && (
+                      <>
+                        <span className="text-zinc-400">
+                          <span className="text-zinc-200 font-medium">{dq.trend_count}</span> trends
+                        </span>
+                        <span className="text-zinc-500">
+                          {dq.sources_ok} sources
+                        </span>
+                        <span className="text-zinc-600">
+                          {formatSize(run.size)}
+                        </span>
+                      </>
+                    )}
+                    {!isFailed && (
+                      <span className="text-blue-400 text-xs">
+                        View &rarr;
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
