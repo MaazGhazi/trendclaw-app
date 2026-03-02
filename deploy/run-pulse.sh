@@ -46,48 +46,103 @@ fi
 SESSION_ID="trendclaw-${TYPE}-$(date +%s)"
 RESULT=$(openclaw agent --session-id "$SESSION_ID" --message "$MSG" --json --timeout 120 2>&1 || true)
 
-# Extract the agent's text response (try to find JSON in it)
-AGENT_OUTPUT=$(echo "$RESULT" | python3 -c "
+# Save raw result to temp file to avoid shell escaping issues
+TMPFILE=$(mktemp /tmp/trendclaw-XXXXXX.json)
+echo "$RESULT" > "$TMPFILE"
+
+# Extract and normalize agent output
+AGENT_OUTPUT=$(python3 -c "
 import sys, json, re
+from datetime import datetime, timezone
 
-raw = sys.stdin.read()
+run_type = '$TYPE'
 
-# Try parsing as OpenClaw agent JSON response
+with open('$TMPFILE') as f:
+    raw = f.read()
+
+text = raw
+
+# Parse OpenClaw envelope: result.payloads[].text
 try:
-    parsed = json.loads(raw)
-    text = parsed.get('reply', parsed.get('text', parsed.get('content', '')))
-    if not text:
-        text = raw
+    envelope = json.loads(raw)
+    payloads = envelope.get('result', {}).get('payloads', [])
+    if payloads:
+        text = payloads[0].get('text', '')
+    elif 'reply' in envelope:
+        text = envelope['reply']
+    elif 'text' in envelope:
+        text = envelope['text']
 except:
-    text = raw
+    pass
 
-# Extract JSON from markdown code blocks if present
-match = re.search(r'\`\`\`(?:json)?\s*(\{.*?\})\s*\`\`\`', text, re.DOTALL)
+# Extract JSON from markdown code blocks
+match = re.search(r'\x60\x60\x60(?:json)?\s*(\{.*?\})\s*\x60\x60\x60', text, re.DOTALL)
 if match:
     text = match.group(1)
 else:
-    # Try to find raw JSON object
     match = re.search(r'(\{.*\})', text, re.DOTALL)
     if match:
         text = match.group(1)
 
-# Validate it's JSON
+now = datetime.now(timezone.utc).isoformat()
+
 try:
-    data = json.loads(text)
-    # Ensure type field exists
-    if 'type' not in data:
-        data['type'] = '$TYPE'
-    if 'timestamp' not in data:
-        from datetime import datetime, timezone
-        data['timestamp'] = datetime.now(timezone.utc).isoformat()
-    print(json.dumps(data))
-except:
-    # Wrap raw output as fallback
-    from datetime import datetime, timezone
+    agent_data = json.loads(text)
+
+    # Agent returns {trends: [...]} — normalize to dashboard schema
+    trends_list = agent_data.get('trends', [])
+
+    # Group into categories
+    cat_map = {}
+    for t in trends_list:
+        src = t.get('source', '')
+        if any(k in src.lower() for k in ['coingecko', 'crypto', 'coin']):
+            cat_name = 'Crypto & Finance'
+        elif any(k in src.lower() for k in ['tiktok', 'reddit', 'bluesky', 'social']):
+            cat_name = 'Social Media'
+        else:
+            cat_name = 'Tech & AI'
+
+        if cat_name not in cat_map:
+            cat_map[cat_name] = []
+
+        pop = t.get('popularity', {})
+        score = pop.get('metric', 0) if isinstance(pop.get('metric'), (int, float)) else 50
+        metric_str = str(pop.get('metric', '')) + ' ' + str(pop.get('unit', ''))
+        reach = 'high' if score > 100 else 'medium' if score > 20 else 'low'
+
+        cat_map[cat_name].append({
+            'title': t.get('title', 'Unknown'),
+            'description': t.get('description', ''),
+            'why_trending': t.get('why_trending', ''),
+            'momentum': 'rising',
+            'popularity': {'score': min(int(score) if isinstance(score, (int,float)) else 50, 100), 'metric': metric_str.strip(), 'reach': reach},
+            'sources': [t.get('source', 'Unknown')],
+            'urls': [t['url']] if t.get('url') else [],
+            'first_seen': None,
+            'relevance': 'high' if score > 100 else 'medium'
+        })
+
+    categories = [{'name': k, 'trends': v} for k, v in cat_map.items()]
+    total_items = sum(len(c['trends']) for c in categories)
+
+    output = {
+        'type': run_type,
+        'timestamp': now,
+        'data_quality': {'sources_ok': len(cat_map), 'sources_failed': [], 'total_raw_items': total_items},
+        'categories': categories,
+        'top_movers': [{'title': trends_list[0]['title'], 'direction': 'new', 'delta': 'Top trend this run'}] if trends_list else [],
+        'signals': {'emerging': [], 'fading': []},
+        'summary': f'{total_items} trends detected across {len(cat_map)} categories.'
+    }
+    print(json.dumps(output))
+
+except Exception as e:
     fallback = {
-        'type': '$TYPE',
-        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'type': run_type,
+        'timestamp': now,
         'raw_output': text[:5000],
+        'parse_error': str(e),
         'data_quality': {'sources_ok': 0, 'sources_failed': ['agent-parse-error'], 'total_raw_items': 0},
         'categories': [],
         'top_movers': [],
@@ -97,18 +152,20 @@ except:
     print(json.dumps(fallback))
 " 2>&1)
 
+rm -f "$TMPFILE"
+
 # Step 3: POST to webhook
 echo "[$(date -u +%H:%M:%S)] Posting to webhook..."
-AUTH_HEADER=""
-if [ -n "$WEBHOOK_TOKEN" ]; then
-  AUTH_HEADER="-H \"Authorization: Bearer $WEBHOOK_TOKEN\""
-fi
+POSTFILE=$(mktemp /tmp/trendclaw-post-XXXXXX.json)
+echo "$AGENT_OUTPUT" > "$POSTFILE"
 
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
   -X POST "$WEBHOOK_URL" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $WEBHOOK_TOKEN" \
-  -d "$AGENT_OUTPUT")
+  -d @"$POSTFILE")
+
+rm -f "$POSTFILE"
 
 if [ "$HTTP_CODE" = "201" ]; then
   echo "[$(date -u +%H:%M:%S)] Success! Delivered to frontend (HTTP $HTTP_CODE)"
