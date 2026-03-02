@@ -54,13 +54,13 @@ TMPFILE=$(mktemp /tmp/trendclaw-XXXXXX.json)
 echo "$RESULT" > "$TMPFILE"
 
 # Extract and normalize agent output
-AGENT_OUTPUT=$(python3 -c "
+AGENT_OUTPUT=$(python3 << 'PYEOF'
 import sys, json, re
 from datetime import datetime, timezone
 
-run_type = '$TYPE'
+run_type = sys.argv[1] if len(sys.argv) > 1 else "pulse"
 
-with open('$TMPFILE') as f:
+with open(sys.argv[2]) as f:
     raw = f.read()
 
 text = raw
@@ -78,30 +78,42 @@ try:
 except:
     pass
 
-# Extract JSON from markdown code blocks
-match = re.search(r'\x60\x60\x60(?:json)?\s*(\{.*?\})\s*\x60\x60\x60', text, re.DOTALL)
-if match:
-    text = match.group(1)
-else:
-    match = re.search(r'(\{.*\})', text, re.DOTALL)
-    if match:
-        text = match.group(1)
+# Strip markdown code fences if present
+text = re.sub(r'```json\s*', '', text)
+text = re.sub(r'```\s*$', '', text.strip())
+text = text.strip()
 
+# Find the outermost JSON object by matching braces
+def extract_json(s):
+    start = s.find('{')
+    if start == -1:
+        return None
+    depth = 0
+    for i in range(start, len(s)):
+        if s[i] == '{': depth += 1
+        elif s[i] == '}': depth -= 1
+        if depth == 0:
+            return s[start:i+1]
+    return None
+
+json_str = extract_json(text)
 now = datetime.now(timezone.utc).isoformat()
 
 try:
-    agent_data = json.loads(text)
-
-    # Agent returns {trends: [...]} — normalize to dashboard schema
+    agent_data = json.loads(json_str)
     trends_list = agent_data.get('trends', [])
 
     # Group into categories
     cat_map = {}
     for t in trends_list:
         src = t.get('source', '')
-        if any(k in src.lower() for k in ['coingecko', 'crypto', 'coin']):
+        src_lower = src.lower()
+        title_lower = t.get('title', '').lower()
+
+        if any(k in src_lower for k in ['coingecko', 'coindesk', 'crypto', 'coin']) or \
+           any(k in title_lower for k in ['bitcoin', 'btc', 'ethereum', 'eth', 'token', 'crypto', 'defi', 'solana']):
             cat_name = 'Crypto & Finance'
-        elif any(k in src.lower() for k in ['tiktok', 'reddit', 'bluesky', 'social']):
+        elif any(k in src_lower for k in ['tiktok', 'reddit', 'bluesky', 'social', 'youtube']):
             cat_name = 'Social Media'
         else:
             cat_name = 'Tech & AI'
@@ -109,24 +121,55 @@ try:
         if cat_name not in cat_map:
             cat_map[cat_name] = []
 
-        pop = t.get('popularity', {})
-        score = pop.get('metric', 0) if isinstance(pop.get('metric'), (int, float)) else 50
-        metric_str = str(pop.get('metric', '')) + ' ' + str(pop.get('unit', ''))
-        reach = 'high' if score > 100 else 'medium' if score > 20 else 'low'
+        # Handle popularity as number or dict
+        pop_raw = t.get('popularity', 0)
+        if isinstance(pop_raw, (int, float)):
+            score = pop_raw
+            metric_str = str(int(score))
+        elif isinstance(pop_raw, dict):
+            score = pop_raw.get('metric', pop_raw.get('score', 50))
+            if isinstance(score, str):
+                # e.g. "17.5%"
+                try: score = float(score.replace('%',''))
+                except: score = 50
+            unit = pop_raw.get('unit', '')
+            metric_str = (str(score) + ' ' + str(unit)).strip()
+        else:
+            score = 50
+            metric_str = str(pop_raw)
+
+        # Normalize score to 0-100
+        if score > 1000: score = 95
+        elif score > 500: score = 90
+        elif score > 200: score = 80
+        elif score > 100: score = 70
+
+        score = min(max(int(score), 1), 100)
+        reach = 'high' if score >= 70 else 'medium' if score >= 40 else 'low'
 
         cat_map[cat_name].append({
             'title': t.get('title', 'Unknown'),
             'description': t.get('description', ''),
             'why_trending': t.get('why_trending', ''),
             'momentum': 'rising',
-            'popularity': {'score': min(int(score) if isinstance(score, (int,float)) else 50, 100), 'metric': metric_str.strip(), 'reach': reach},
-            'sources': [t.get('source', 'Unknown')],
+            'popularity': {'score': score, 'metric': metric_str, 'reach': reach},
+            'sources': [src] if src else ['Unknown'],
             'urls': [t['url']] if t.get('url') else [],
             'first_seen': None,
-            'relevance': 'high' if score > 100 else 'medium'
+            'relevance': 'high' if score >= 70 else 'medium'
         })
 
-    categories = [{'name': k, 'trends': v} for k, v in cat_map.items()]
+    # Sort categories in preferred order
+    order = ['Tech & AI', 'Crypto & Finance', 'Social Media']
+    categories = []
+    for name in order:
+        if name in cat_map:
+            categories.append({'name': name, 'trends': cat_map[name]})
+    # Add any extras
+    for name, trends in cat_map.items():
+        if name not in order:
+            categories.append({'name': name, 'trends': trends})
+
     total_items = sum(len(c['trends']) for c in categories)
 
     output = {
@@ -144,7 +187,7 @@ except Exception as e:
     fallback = {
         'type': run_type,
         'timestamp': now,
-        'raw_output': text[:5000],
+        'raw_output': (json_str or text)[:5000],
         'parse_error': str(e),
         'data_quality': {'sources_ok': 0, 'sources_failed': ['agent-parse-error'], 'total_raw_items': 0},
         'categories': [],
@@ -153,7 +196,8 @@ except Exception as e:
         'summary': 'Agent output could not be parsed as structured JSON.'
     }
     print(json.dumps(fallback))
-" 2>&1)
+PYEOF
+ "$TYPE" "$TMPFILE" 2>&1)
 
 rm -f "$TMPFILE"
 
