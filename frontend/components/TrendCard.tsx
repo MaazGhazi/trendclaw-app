@@ -18,16 +18,20 @@ interface Trend {
 
 const momentumColors: Record<string, string> = {
   rising: "text-green-400",
+  viral: "text-emerald-300",
   peaking: "text-yellow-400",
   stable: "text-blue-400",
+  falling: "text-red-400",
   declining: "text-red-400",
   new: "text-purple-400",
 };
 
 const momentumIcons: Record<string, string> = {
   rising: "^",
+  viral: "^^",
   peaking: ">>",
   stable: "~",
+  falling: "v",
   declining: "v",
   new: "*",
 };
@@ -73,9 +77,11 @@ export default function TrendCard({ trend }: { trend: Trend }) {
         {trend.description}
       </p>
 
-      <p className="text-xs text-zinc-500 mb-3 italic">
-        {trend.why_trending}
-      </p>
+      {trend.why_trending && (
+        <p className="text-xs text-zinc-500 mb-3 italic">
+          {trend.why_trending}
+        </p>
+      )}
 
       <div className="flex items-center justify-between mb-2">
         <ScoreBar score={trend.popularity.score} />
