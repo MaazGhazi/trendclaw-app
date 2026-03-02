@@ -21,25 +21,28 @@ node dist/index.js --type "$TYPE" 2>&1 || echo "WARNING: scraper had errors"
 echo "[$(date -u +%H:%M:%S)] Running agent..."
 
 if [ "$TYPE" = "pulse" ]; then
-  MODEL="openai/gpt-4o-mini"
   MSG="Quick pulse check. Use the trend_monitor skill. Run type: pulse.
 Read the pre-collected data from $DATA_FILE.
-Analyze top movers. Use 0-2 web_search queries for breaking news.
-Return top 5-8 trends with popularity scores.
+Analyze ALL sources. Use 0-2 web_search queries for breaking news.
+Return 12-15 trends with popularity scores.
+MUST include trends from ALL 3 categories: Tech & AI, Crypto & Finance, Social Media. At least 3 trends per category.
+For each trend include: title, description, why_trending, source, url, and popularity (metric number + unit).
 IMPORTANT: Return ONLY valid JSON matching the trend_monitor output schema. No markdown, no explanation, just the JSON object."
 elif [ "$TYPE" = "digest" ]; then
-  MODEL="openai/gpt-4o"
   MSG="Daily digest. Use the trend_monitor skill. Run type: digest.
 Read the pre-collected data from $DATA_FILE.
 Cross-reference trends across platforms. Use 3-5 web_search queries.
-Return 12-20 trends with full popularity metrics.
+Return 18-25 trends with full popularity metrics.
+MUST include trends from ALL 3 categories: Tech & AI, Crypto & Finance, Social Media. At least 5 trends per category.
+For each trend include: title, description, why_trending, source, url, and popularity (metric number + unit).
 IMPORTANT: Return ONLY valid JSON matching the trend_monitor output schema. No markdown, no explanation, just the JSON object."
 else
-  MODEL="openai/gpt-4o"
   MSG="Weekly deep dive. Use the trend_monitor skill. Run type: deep_dive.
 Read the pre-collected data from $DATA_FILE.
 Cross-reference all platforms. Use 8-10 web_search queries.
-Return 15-25 trends with full analysis.
+Return 20-30 trends with full analysis.
+MUST include trends from ALL 3 categories: Tech & AI, Crypto & Finance, Social Media. At least 6 trends per category.
+For each trend include: title, description, why_trending, source, url, and popularity (metric number + unit).
 IMPORTANT: Return ONLY valid JSON matching the trend_monitor output schema. No markdown, no explanation, just the JSON object."
 fi
 
