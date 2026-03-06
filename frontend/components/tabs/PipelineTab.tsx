@@ -1,15 +1,15 @@
 "use client";
 
-import type { ProgressData, HistoryRun } from "@/lib/types";
-import { TYPE_LABELS, TYPE_COLORS, STEP_NAMES, STEP_ORDER } from "@/lib/types";
-import { totalDuration } from "@/lib/hooks";
+import type { ProgressData, HistoryRun, QueueData } from "@/lib/types";
+import { TYPE_LABELS, TYPE_COLORS, USER_STEP_LABELS, USER_STEP_ORDER } from "@/lib/types";
+import { formatAge } from "@/lib/hooks";
 import StatusIcon from "@/components/StatusIcon";
-import SourceAgentCard from "@/components/SourceAgentCard";
 
 interface PipelineTabProps {
   progress: ProgressData | null;
   progressError: string;
   elapsed: string;
+  queueData: QueueData | null;
   recentRuns: HistoryRun[];
   onViewRun: (file: string) => void;
 }
@@ -20,19 +20,49 @@ const overallStatusColor: Record<string, string> = {
   failed: "text-red-400",
 };
 
+function formatJobName(name: string): string {
+  if (name === "global") return "Global Sources";
+  if (name.startsWith("region-")) return `Region: ${name.replace("region-", "")}`;
+  if (name.startsWith("topic-")) {
+    const id = name.replace("topic-", "");
+    return id.length > 12 ? `Topic: ${id.slice(0, 8)}...` : `Topic: ${id}`;
+  }
+  return name;
+}
+
+function jobTypeIcon(name: string): string {
+  if (name === "global") return "🌐";
+  if (name.startsWith("region-")) return "📍";
+  if (name.startsWith("topic-")) return "🎯";
+  return "📦";
+}
+
 export default function PipelineTab({
   progress,
   progressError,
   elapsed,
+  queueData,
   recentRuns,
   onViewRun,
 }: PipelineTabProps) {
+  const scraping = progress?.steps?.scraping;
+  const users = progress?.steps?.users;
+  const scrapePercent =
+    scraping && scraping.total > 0
+      ? Math.round((scraping.completed / scraping.total) * 100)
+      : 0;
+
+  // Build job list: done + remaining
+  const doneJobs = scraping?.done_jobs || [];
+  const allJobCount = scraping?.total || 0;
+  const pendingCount = allJobCount - doneJobs.length;
+
   return (
     <div className="space-y-8">
-      {/* Current / last pipeline run */}
+      {/* ─── Pipeline Status Header ─── */}
       <section>
         <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
-          {progress?.status === "running" ? "Current Run" : "Last Run"}
+          {progress?.status === "running" ? "Pipeline Active" : "Pipeline Status"}
         </h2>
 
         {progressError && !progress && (
@@ -46,8 +76,8 @@ export default function PipelineTab({
 
         {progress && (
           <>
-            {/* Run info bar */}
-            <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+            {/* Status bar */}
+            <div className="flex items-center gap-3 mb-6 p-3 rounded-lg bg-zinc-900 border border-zinc-800">
               <span
                 className={`text-xs px-2 py-0.5 rounded border font-medium ${TYPE_COLORS[progress.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"}`}
               >
@@ -62,84 +92,289 @@ export default function PipelineTab({
               <span
                 className={`text-xs font-medium capitalize ml-auto ${overallStatusColor[progress.status] || "text-zinc-400"}`}
               >
+                {progress.status === "running" && (
+                  <span className="inline-block h-2 w-2 rounded-full bg-blue-400 animate-pulse mr-1.5 align-middle" />
+                )}
                 {progress.status}
               </span>
-              {progress.status !== "running" && (
-                <span className="text-xs text-zinc-500">
-                  Total: {totalDuration(progress.steps)}
-                </span>
-              )}
             </div>
 
-            {/* Pipeline steps timeline */}
-            <div className="space-y-1">
-              {STEP_ORDER.map((key, idx) => {
-                const step = progress.steps[key];
-                if (!step) return null;
-                const isLast = idx === STEP_ORDER.length - 1;
+            {/* ─── Scraping Phase ─── */}
+            <div className="rounded-lg border border-zinc-800 overflow-hidden mb-6">
+              {/* Scraping header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <StatusIcon status={scraping?.status || "pending"} />
+                  <span className="text-sm font-medium text-zinc-200">
+                    Parallel Scraping
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-zinc-400 font-mono">
+                    {scraping?.completed || 0}/{allJobCount} jobs
+                  </span>
+                  {scraping?.duration_s != null && (
+                    <span className="text-xs text-zinc-500 font-mono">
+                      {scraping.duration_s.toFixed(1)}s
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                return (
-                  <div key={key}>
-                    <div className="flex items-start gap-3 py-2">
-                      <div className="flex flex-col items-center pt-0.5">
-                        <StatusIcon status={step.status} />
-                        {!isLast && (
-                          <div
-                            className={`w-px flex-1 min-h-[16px] mt-1 ${
-                              step.status === "completed"
-                                ? "bg-zinc-700"
-                                : "bg-zinc-800"
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`text-sm font-medium ${
-                              step.status === "pending"
-                                ? "text-zinc-500"
-                                : "text-zinc-200"
-                            }`}
-                          >
-                            {STEP_NAMES[key]}
+              <div className="p-4 space-y-4">
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="h-2.5 rounded-full bg-zinc-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-blue-500 to-emerald-500"
+                      style={{ width: `${scrapePercent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-zinc-600">
+                    <span>{scrapePercent}%</span>
+                    <span>
+                      {scraping?.status === "completed"
+                        ? "All scrapes complete"
+                        : `${pendingCount} job${pendingCount !== 1 ? "s" : ""} in progress`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Job cards grid */}
+                {allJobCount > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {/* Completed jobs */}
+                    {doneJobs.map((job) => (
+                      <div
+                        key={job}
+                        className="flex items-center gap-2 rounded-lg border border-emerald-800/40 bg-emerald-950/20 px-3 py-2"
+                      >
+                        <StatusIcon status="completed" />
+                        <div className="min-w-0">
+                          <span className="text-xs font-medium text-zinc-200 block truncate">
+                            {formatJobName(job)}
                           </span>
-                          {step.duration_s != null && (
-                            <span className="text-xs text-zinc-500 font-mono">
-                              {step.duration_s.toFixed(1)}s
-                            </span>
-                          )}
+                          <span className="text-[10px] text-zinc-500">
+                            {jobTypeIcon(job)} done
+                          </span>
                         </div>
-                        {step.detail && (
-                          <p className="text-xs text-zinc-500 mt-0.5">
-                            {step.detail}
-                          </p>
-                        )}
-
-                        {/* Source agents grid */}
-                        {key === "agents" &&
-                          step.sources &&
-                          step.sources.length > 0 && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-                              {step.sources.map((src) => (
-                                <SourceAgentCard key={src.name} source={src} />
-                              ))}
-                            </div>
-                          )}
                       </div>
+                    ))}
+                    {/* Remaining jobs (running) */}
+                    {Array.from({ length: pendingCount }).map((_, i) => (
+                      <div
+                        key={`pending-${i}`}
+                        className="flex items-center gap-2 rounded-lg border border-blue-800/40 bg-blue-950/20 px-3 py-2"
+                      >
+                        <StatusIcon status="running" />
+                        <div className="min-w-0">
+                          <span className="text-xs font-medium text-zinc-300 block truncate">
+                            Scraping...
+                          </span>
+                          <span className="text-[10px] text-zinc-500">
+                            in progress
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ─── AI Enrichment Phase ─── */}
+            <div className="rounded-lg border border-zinc-800 overflow-hidden">
+              {/* AI header */}
+              <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <StatusIcon status={users?.status || "pending"} />
+                  <span className="text-sm font-medium text-zinc-200">
+                    AI Enrichment
+                  </span>
+                </div>
+                <span className="text-xs text-zinc-400 font-mono">
+                  {users?.completed || 0}/{users?.total || 0} user{(users?.total || 0) !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="p-4">
+                {users?.status === "pending" && (
+                  <p className="text-xs text-zinc-600">
+                    Waiting for scraping to complete...
+                  </p>
+                )}
+
+                {users?.status === "running" && (
+                  <div className="space-y-4">
+                    {/* Current user */}
+                    {progress.current_user && (
+                      <div className="flex items-center gap-2 text-xs text-zinc-300">
+                        <span className="text-zinc-500">Processing:</span>
+                        <span className="font-mono bg-zinc-800 px-2 py-0.5 rounded">
+                          {progress.current_user.length > 20
+                            ? `${progress.current_user.slice(0, 8)}...`
+                            : progress.current_user}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Step progression */}
+                    <div className="flex items-center gap-1">
+                      {USER_STEP_ORDER.map((step, idx) => {
+                        const isCurrent = users.current_step === step;
+                        const currentIdx = USER_STEP_ORDER.indexOf(
+                          users.current_step || "merging"
+                        );
+                        const isDone = idx < currentIdx;
+
+                        return (
+                          <div key={step} className="flex items-center gap-1 flex-1">
+                            <div
+                              className={`flex-1 rounded-md px-2.5 py-2 text-center text-[10px] font-medium transition-colors ${
+                                isCurrent
+                                  ? "bg-blue-900/50 text-blue-300 border border-blue-700"
+                                  : isDone
+                                    ? "bg-emerald-900/30 text-emerald-400 border border-emerald-800/40"
+                                    : "bg-zinc-900 text-zinc-600 border border-zinc-800"
+                              }`}
+                            >
+                              {isCurrent && (
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse mr-1 align-middle" />
+                              )}
+                              {isDone && (
+                                <span className="text-emerald-400 mr-1">✓</span>
+                              )}
+                              {USER_STEP_LABELS[step]?.split(" ").slice(0, 2).join(" ") || step}
+                            </div>
+                            {idx < USER_STEP_ORDER.length - 1 && (
+                              <span
+                                className={`text-[10px] ${
+                                  isDone ? "text-emerald-700" : "text-zinc-700"
+                                }`}
+                              >
+                                →
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
+                )}
+
+                {users?.status === "completed" && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-400">
+                    <StatusIcon status="completed" />
+                    All {users.total} user{users.total !== 1 ? "s" : ""} enriched
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
       </section>
 
-      {/* Recent Runs table */}
+      {/* ─── Job Queue ─── */}
+      {queueData && queueData.queued.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
+            Queue ({queueData.queued.length} waiting)
+          </h2>
+          <div className="space-y-2">
+            {queueData.queued.map((job, idx) => (
+              <div
+                key={job.id}
+                className="flex items-center gap-3 p-3 rounded-lg bg-zinc-900 border border-zinc-800"
+              >
+                <span className="text-xs font-mono text-zinc-600 w-6">
+                  #{idx + 1}
+                </span>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded border font-medium ${TYPE_COLORS[job.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"}`}
+                >
+                  {TYPE_LABELS[job.type] || job.type}
+                </span>
+                <span className="text-xs text-zinc-500">
+                  queued {formatAge(job.queued_at)}
+                </span>
+                {job.queued_by && (
+                  <span className="text-xs text-zinc-600 font-mono">
+                    by {job.queued_by.slice(0, 8)}...
+                  </span>
+                )}
+                <span className="ml-auto">
+                  <span className="flex h-5 w-5 items-center justify-center">
+                    <span className="h-2.5 w-2.5 rounded-full border-2 border-zinc-600" />
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── Completed Jobs ─── */}
+      {queueData && queueData.completed.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
+            Completed Jobs
+          </h2>
+          <div className="overflow-hidden rounded-lg border border-zinc-800">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-zinc-900/50">
+                  <th className="text-left px-3 py-2 text-zinc-500 font-medium">Type</th>
+                  <th className="text-left px-3 py-2 text-zinc-500 font-medium">Started</th>
+                  <th className="text-right px-3 py-2 text-zinc-500 font-medium">Duration</th>
+                  <th className="text-right px-3 py-2 text-zinc-500 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/50">
+                {queueData.completed.slice(0, 15).map((job) => (
+                  <tr key={job.id} className="hover:bg-zinc-800/30">
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-medium ${TYPE_COLORS[job.type] || "bg-zinc-800 text-zinc-300 border-zinc-700"}`}
+                      >
+                        {TYPE_LABELS[job.type] || job.type}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-zinc-400">
+                      {new Date(job.started_at).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="px-3 py-2 text-right text-zinc-400 font-mono">
+                      {job.duration_s < 60
+                        ? `${job.duration_s}s`
+                        : `${Math.floor(job.duration_s / 60)}m ${job.duration_s % 60}s`}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span
+                        className={`text-xs font-medium ${
+                          job.status === "completed"
+                            ? "text-emerald-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {job.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ─── Recent Runs (Trend Data) ─── */}
       <section>
         <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
-          Recent Runs
+          Recent Runs (Trend Data)
         </h2>
         {recentRuns.filter((r) => !r.failed).length === 0 ? (
           <p className="text-xs text-zinc-600">No runs yet.</p>

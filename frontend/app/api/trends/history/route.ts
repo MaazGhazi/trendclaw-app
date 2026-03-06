@@ -1,85 +1,72 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-
-const EXCLUDED_FILES = new Set(["progress.json", "run.lock"]);
-
-// Parse type and timestamp from filename like "deep_dive-2026-03-02T05-12-31-084Z.json"
-function parseFilename(f: string) {
-  const base = f.replace(".json", "");
-  // Type is everything before the first YYYY pattern
-  const match = base.match(/^(.+?)-(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/);
-  if (!match) return { type: base.split("-")[0], timestamp: "" };
-  const [, type, y, mo, d, h, mi, s, ms] = match;
-  return { type, timestamp: `${y}-${mo}-${d}T${h}:${mi}:${s}.${ms}Z` };
-}
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
-  if (!fs.existsSync(DATA_DIR)) {
-    return NextResponse.json({ runs: [] });
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const files = fs
-    .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".json") && !EXCLUDED_FILES.has(f));
+  const runId = request.nextUrl.searchParams.get("file");
 
-  const fileParam = request.nextUrl.searchParams.get("file");
+  // If a specific run is requested, return its contents
+  if (runId) {
+    // Extract UUID from the "type-uuid" format
+    const id = runId.includes("-") ? runId.substring(runId.indexOf("-") + 1) : runId;
 
-  // If a specific file is requested, return its contents
-  if (fileParam) {
-    const safeName = path.basename(fileParam);
-    const filePath = path.join(DATA_DIR, safeName);
-    if (!fs.existsSync(filePath) || !safeName.endsWith(".json") || EXCLUDED_FILES.has(safeName)) {
+    const { data, error } = await supabase
+      .from("trend_runs")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    const content = fs.readFileSync(filePath, "utf-8");
-    return NextResponse.json({ file: safeName, data: JSON.parse(content) });
+
+    return NextResponse.json({
+      file: `${data.run_type}-${data.id}`,
+      data: data.data,
+      region: data.region,
+    });
   }
 
-  // Build enriched run list
-  const runs = files.map((f) => {
-    const filePath = path.join(DATA_DIR, f);
-    const stat = fs.statSync(filePath);
-    const { type, timestamp } = parseFilename(f);
+  // List all runs (RLS filters by user's region)
+  const { data: runs, error } = await supabase
+    .from("trend_runs")
+    .select("id, region, run_type, created_at, data")
+    .order("created_at", { ascending: false })
+    .limit(100);
 
-    let data_quality: { sources_ok: number; total_items: number; trend_count: number } | undefined;
-    let failed = false;
-    try {
-      const content = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-      const categories = content.categories || [];
-      const trendCount = categories.reduce(
-        (sum: number, cat: { trends?: unknown[] }) => sum + (cat.trends?.length || 0),
-        0
-      );
-      const sourcesOk = content.data_quality?.sources_ok ?? 0;
-      const totalItems = content.data_quality?.total_raw_items ?? 0;
+  if (error) {
+    return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
+  }
 
-      data_quality = {
+  const enrichedRuns = (runs || []).map((run) => {
+    const categories = run.data?.categories || [];
+    const trendCount = categories.reduce(
+      (sum: number, cat: { trends?: unknown[] }) => sum + (cat.trends?.length || 0),
+      0
+    );
+    const sourcesOk = run.data?.data_quality?.sources_ok ?? 0;
+    const totalItems = run.data?.data_quality?.total_raw_items ?? 0;
+    const failed = !!run.data?.parse_error || (trendCount === 0 && sourcesOk === 0);
+
+    return {
+      file: `${run.run_type}-${run.id}`,
+      type: run.run_type,
+      region: run.region,
+      created: run.created_at,
+      data_quality: {
         sources_ok: sourcesOk,
         total_items: totalItems,
         trend_count: trendCount,
-      };
-
-      // Mark as failed if parse error or zero trends with zero sources
-      failed = !!content.parse_error || (trendCount === 0 && sourcesOk === 0);
-    } catch {
-      failed = true;
-    }
-
-    return {
-      file: f,
-      type,
-      size: stat.size,
-      created: timestamp || stat.birthtime.toISOString(),
-      data_quality,
+      },
       failed,
     };
   });
 
-  // Sort by timestamp descending (newest first)
-  runs.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
-
-  return NextResponse.json({ runs });
+  return NextResponse.json({ runs: enrichedRuns });
 }

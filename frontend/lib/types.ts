@@ -31,6 +31,35 @@ export interface TrendData {
 
 // --- Pipeline / progress types ---
 
+export interface ScrapingStep {
+  status: "pending" | "running" | "completed";
+  total: number;
+  completed: number;
+  done_jobs?: string[];
+  duration_s?: number;
+  detail?: string;
+}
+
+export interface UsersStep {
+  status: "pending" | "running" | "completed";
+  total: number;
+  completed: number;
+  current_step?: "merging" | "analyzing" | "summarizing" | "storing";
+}
+
+export interface ProgressData {
+  run_id: string;
+  type: string;
+  started_at: string;
+  status: "running" | "completed" | "failed";
+  current_user?: string;
+  steps: {
+    scraping: ScrapingStep;
+    users: UsersStep;
+  };
+}
+
+// Legacy types (kept for backward compat if old progress data appears)
 export interface SourceAgent {
   name: string;
   status: "pending" | "running" | "completed" | "failed";
@@ -39,27 +68,35 @@ export interface SourceAgent {
   size_b?: number;
 }
 
-export interface PipelineStep {
-  status: "pending" | "running" | "completed" | "failed";
-  duration_s?: number;
-  detail?: string;
-  sources?: SourceAgent[];
+// --- Queue / Job types ---
+
+export interface QueuedJob {
+  id: string;
+  type: string;
+  queued_at: string;
+  queued_by?: string;
 }
 
-export interface ProgressData {
-  run_id: string;
+export interface CompletedJob {
+  id: string;
   type: string;
   started_at: string;
-  status: "running" | "completed" | "failed";
-  steps: {
-    scraper: PipelineStep;
-    split: PipelineStep;
-    agents: PipelineStep;
-    aggregation: PipelineStep;
-    summary: PipelineStep;
-    memory: PipelineStep;
-    webhook: PipelineStep;
-  };
+  completed_at: string;
+  duration_s: number;
+  status: "completed" | "failed";
+}
+
+export interface RunningJob {
+  id: string;
+  type: string;
+  pid: number;
+  started_at: string;
+}
+
+export interface QueueData {
+  running: RunningJob | null;
+  queued: QueuedJob[];
+  completed: CompletedJob[];
 }
 
 // --- History types ---
@@ -67,7 +104,8 @@ export interface ProgressData {
 export interface HistoryRun {
   file: string;
   type: string;
-  size: number;
+  size?: number;
+  region?: string;
   created: string;
   failed?: boolean;
   data_quality?: {
@@ -98,21 +136,15 @@ export const TYPE_BUTTON_COLORS: Record<string, string> = {
 };
 
 export const STEP_NAMES: Record<string, string> = {
-  scraper: "Scraper",
-  split: "Split Sources",
-  agents: "Source Agents",
-  aggregation: "Aggregation",
-  summary: "Summary Agent",
-  memory: "Memory Write",
-  webhook: "Webhook POST",
+  scraping: "Parallel Scraping",
+  users: "AI Enrichment",
 };
 
-export const STEP_ORDER = [
-  "scraper",
-  "split",
-  "agents",
-  "aggregation",
-  "summary",
-  "memory",
-  "webhook",
-] as const;
+export const USER_STEP_LABELS: Record<string, string> = {
+  merging: "Merging source data",
+  analyzing: "AI analyzing trends",
+  summarizing: "Generating summary",
+  storing: "Saving results",
+};
+
+export const USER_STEP_ORDER = ["merging", "analyzing", "summarizing", "storing"] as const;

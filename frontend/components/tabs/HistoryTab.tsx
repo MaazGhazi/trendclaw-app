@@ -142,9 +142,11 @@ export default function HistoryTab({ runs, loading, onViewRun }: HistoryTabProps
                         <span className="text-zinc-500">
                           {dq.sources_ok} sources
                         </span>
-                        <span className="text-zinc-600">
-                          {formatSize(run.size)}
-                        </span>
+                        {run.size != null && (
+                          <span className="text-zinc-600">
+                            {formatSize(run.size)}
+                          </span>
+                        )}
                       </>
                     )}
                     {!isFailed && (

@@ -32,7 +32,7 @@ export default function SystemHealthStrip({
         />
         <span className={isRunning ? "text-blue-400" : ""}>
           {isRunning
-            ? `Running ${TYPE_LABELS[progress.type] || progress.type}... ${elapsed}`
+            ? `Running ${TYPE_LABELS[progress.type] || progress.type}${progress.current_user ? ` (user: ${progress.current_user.slice(0, 8)}...)` : ""}... ${elapsed}`
             : "Idle"}
         </span>
       </div>

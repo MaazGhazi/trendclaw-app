@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { TrendData, ProgressData, HistoryRun } from "./types";
+import type { TrendData, ProgressData, HistoryRun, QueueData } from "./types";
 import { TYPE_LABELS } from "./types";
 
 // --- useTrends: polls /api/trends or fetches a specific historical file ---
@@ -9,6 +9,7 @@ import { TYPE_LABELS } from "./types";
 export function useTrends(file?: string | null) {
   const [data, setData] = useState<TrendData | null>(null);
   const [currentFile, setCurrentFile] = useState("");
+  const [region, setRegion] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const fetchTrends = useCallback(async () => {
@@ -17,8 +18,12 @@ export function useTrends(file?: string | null) {
         ? `/api/trends/history?file=${encodeURIComponent(file)}`
         : "/api/trends";
       const res = await fetch(url);
+      if (res.status === 401) {
+        setError("sign-in-required");
+        return;
+      }
       if (res.status === 404) {
-        setError("No trend data yet. Waiting for first webhook...");
+        setError("No trend data yet. Waiting for first pipeline run...");
         return;
       }
       if (!res.ok) {
@@ -28,6 +33,7 @@ export function useTrends(file?: string | null) {
       const json = await res.json();
       setData(json.data);
       setCurrentFile(json.file || file || "");
+      setRegion(json.region || null);
       setError("");
     } catch {
       setError("Connection error");
@@ -43,7 +49,7 @@ export function useTrends(file?: string | null) {
     }
   }, [fetchTrends, file]);
 
-  return { data, file: currentFile, error, refetch: fetchTrends };
+  return { data, file: currentFile, region, error, refetch: fetchTrends };
 }
 
 // --- useProgress: polls /api/progress (2s when running, 10s idle) ---
@@ -99,6 +105,34 @@ export function useProgress() {
   return { data, error, elapsed, refetch: fetchProgress };
 }
 
+// --- useQueue: polls /api/run for queue status (5s when running, 15s idle) ---
+
+export function useQueue() {
+  const [data, setData] = useState<QueueData | null>(null);
+
+  const fetchQueue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/run");
+      if (!res.ok) return;
+      const json = await res.json();
+      setData(json);
+    } catch {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchQueue();
+    const interval = setInterval(
+      fetchQueue,
+      data?.running ? 5000 : 15000
+    );
+    return () => clearInterval(interval);
+  }, [fetchQueue, data?.running]);
+
+  return { data, refetch: fetchQueue };
+}
+
 // --- useHistory: fetches /api/trends/history ---
 
 export function useHistory() {
@@ -145,10 +179,11 @@ export function useRunTrigger(onStarted?: () => void) {
           body: JSON.stringify({ type }),
         });
         const json = await res.json();
-        if (res.status === 409) {
-          setMessage("A pipeline is already running.");
-        } else if (!res.ok) {
+        if (!res.ok) {
           setMessage(json.error || "Failed to start pipeline");
+        } else if (json.queued) {
+          setMessage(`${TYPE_LABELS[type] || type} queued (position ${json.position})`);
+          onStarted?.();
         } else {
           setMessage(`${TYPE_LABELS[type] || type} started!`);
           onStarted?.();
@@ -181,9 +216,7 @@ export function formatElapsed(startedAt: string): string {
 
 export function totalDuration(steps: ProgressData["steps"]): string {
   let total = 0;
-  for (const step of Object.values(steps)) {
-    if (step.duration_s) total += step.duration_s;
-  }
+  if (steps.scraping?.duration_s) total += steps.scraping.duration_s;
   return total > 0 ? `${total.toFixed(1)}s` : "";
 }
 

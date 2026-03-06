@@ -1,5 +1,8 @@
 export type RunType = "pulse" | "digest" | "deep_dive";
 
+/** Scraping phase — controls which sources run */
+export type Phase = "global" | "region" | "topic" | "all";
+
 export interface ScrapedItem {
   title: string;
   url?: string;
@@ -31,6 +34,7 @@ export interface SourceResult {
 
 export interface CollectedData {
   runType: RunType;
+  phase?: Phase;
   collectedAt: string;
   sources: SourceResult[];
   totalItems: number;
@@ -42,4 +46,6 @@ export interface SourceCollector {
   collect: (runType: RunType) => Promise<SourceResult>;
   /** Which run types this source should be included in */
   runTypes: RunType[];
+  /** Which phase this source belongs to */
+  phase: Phase;
 }

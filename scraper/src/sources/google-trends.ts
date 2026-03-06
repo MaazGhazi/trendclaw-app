@@ -1,13 +1,15 @@
 import { XMLParser } from "fast-xml-parser";
 import { newPage } from "./browser.js";
 import type { RunType, ScrapedItem, SourceResult } from "../types.js";
+import { getUserConfig } from "../user-config.js";
 
 async function collectViaRSS(): Promise<ScrapedItem[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
+  const region = getUserConfig().region;
 
   try {
-    const res = await fetch("https://trends.google.com/trending/rss?geo=US", {
+    const res = await fetch(`https://trends.google.com/trending/rss?geo=${region}`, {
       signal: controller.signal,
       headers: { "User-Agent": "TrendClaw/1.0 (trend monitoring)" },
     });
@@ -50,7 +52,8 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
   const page = await newPage();
 
   try {
-    await page.goto("https://trends.google.com/trending?geo=US", {
+    const region = getUserConfig().region;
+    await page.goto(`https://trends.google.com/trending?geo=${region}`, {
       waitUntil: "networkidle",
       timeout: 45000,
     });

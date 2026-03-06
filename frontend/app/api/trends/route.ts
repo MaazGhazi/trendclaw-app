@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import fs from "fs";
 import path from "path";
 
@@ -25,20 +26,7 @@ function pruneOldFiles() {
   }
 }
 
-function getLatestFile(): string | null {
-  ensureDataDir();
-  const files = fs
-    .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run"))
-    .sort((a, b) => {
-      const aStat = fs.statSync(path.join(DATA_DIR, a));
-      const bStat = fs.statSync(path.join(DATA_DIR, b));
-      return bStat.mtimeMs - aStat.mtimeMs;
-    });
-  return files[0] || null;
-}
-
-// POST — webhook receiver
+// POST — webhook receiver (kept for backward compatibility)
 export async function POST(request: NextRequest) {
   const token = process.env.OPENCLAW_HOOKS_TOKEN;
   if (token) {
@@ -66,17 +54,30 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, file: filename }, { status: 201 });
 }
 
-// GET — return latest trends
+// GET — return latest trends for the logged-in user's region
 export async function GET() {
-  ensureDataDir();
-  const latest = getLatestFile();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!latest) {
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // RLS policy filters by user's region automatically
+  const { data, error } = await supabase
+    .from("trend_runs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
     return NextResponse.json({ error: "No trend data yet" }, { status: 404 });
   }
 
-  const content = fs.readFileSync(path.join(DATA_DIR, latest), "utf-8");
-  const data = JSON.parse(content);
-
-  return NextResponse.json({ file: latest, data });
+  return NextResponse.json({
+    file: `${data.run_type}-${data.id}`,
+    data: data.data,
+    region: data.region,
+  });
 }

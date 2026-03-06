@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import type { RunType, CollectedData, SourceResult } from "./types.js";
+import type { RunType, Phase, CollectedData, SourceResult } from "./types.js";
+import { getUserConfig, initUserConfig } from "./user-config.js";
 
 // API sources (fast, reliable)
 import * as hackernews from "./sources/hackernews.js";
@@ -21,98 +22,172 @@ import * as googleTrends from "./sources/google-trends.js";
 import * as tiktok from "./sources/tiktok.js";
 import { closeBrowser } from "./sources/browser.js";
 
-// Source registry: which collectors run for which run types
-const API_SOURCES: Array<{
+// ─── Source registry by phase ────────────────────────────────────
+
+interface SourceDef {
   name: string;
   collect: (rt: RunType) => Promise<SourceResult>;
   runTypes: RunType[];
-}> = [
-  { name: "hackernews", collect: hackernews.collect, runTypes: ["pulse", "digest", "deep_dive"] },
-  { name: "coingecko", collect: coingecko.collect, runTypes: ["pulse", "digest", "deep_dive"] },
-  { name: "lobsters", collect: lobsters.collect, runTypes: ["pulse", "digest", "deep_dive"] },
-  { name: "wikipedia", collect: wikipedia.collect, runTypes: ["digest", "deep_dive"] },
-  { name: "bluesky", collect: bluesky.collect, runTypes: ["digest", "deep_dive"] },
-  { name: "youtube", collect: youtube.collect, runTypes: ["digest", "deep_dive"] },
-  { name: "newsapi", collect: newsapi.collect, runTypes: ["digest", "deep_dive"] },
-  { name: "devto", collect: devto.collect, runTypes: ["digest", "deep_dive"] },
+  phase: "global" | "region" | "topic";
+  browser?: boolean; // needs sequential execution
+}
+
+const SOURCES: SourceDef[] = [
+  // ── Global (same for everyone) ──
+  { name: "hackernews",      collect: hackernews.collect,       runTypes: ["pulse", "digest", "deep_dive"], phase: "global" },
+  { name: "coingecko",       collect: coingecko.collect,        runTypes: ["pulse", "digest", "deep_dive"], phase: "global" },
+  { name: "lobsters",        collect: lobsters.collect,         runTypes: ["pulse", "digest", "deep_dive"], phase: "global" },
+  { name: "wikipedia",       collect: wikipedia.collect,        runTypes: ["digest", "deep_dive"],          phase: "global" },
+  { name: "devto",           collect: devto.collect,            runTypes: ["digest", "deep_dive"],          phase: "global" },
+  { name: "github-trending", collect: githubTrending.collect,   runTypes: ["pulse", "digest", "deep_dive"], phase: "global", browser: true },
+
+  // ── Region (varies by country) ──
+  { name: "youtube",         collect: youtube.collect,          runTypes: ["digest", "deep_dive"],          phase: "region" },
+  { name: "newsapi",         collect: newsapi.collect,          runTypes: ["digest", "deep_dive"],          phase: "region" },
+  { name: "google-trends",   collect: googleTrends.collect,     runTypes: ["digest", "deep_dive"],          phase: "region", browser: true },
+  { name: "tiktok",          collect: tiktok.collect,           runTypes: ["digest", "deep_dive"],          phase: "region", browser: true },
+
+  // ── Topic (per-user keywords/niche) ──
+  { name: "youtube-search",  collect: youtube.collectByKeywords,  runTypes: ["pulse", "digest", "deep_dive"], phase: "topic" },
+  { name: "newsapi-kw",      collect: newsapi.collectByKeywords,  runTypes: ["digest", "deep_dive"],          phase: "topic" },
+  { name: "bluesky-kw",      collect: bluesky.collectByKeywords,  runTypes: ["pulse", "digest", "deep_dive"], phase: "topic" },
+  { name: "devto-kw",        collect: devto.collectByKeywords,    runTypes: ["digest", "deep_dive"],          phase: "topic" },
+  // Bluesky global trending is also useful
+  { name: "bluesky",         collect: bluesky.collect,            runTypes: ["digest", "deep_dive"],          phase: "global" },
 ];
 
-const BROWSER_SOURCES: Array<{
-  name: string;
-  collect: (rt: RunType) => Promise<SourceResult>;
-  runTypes: RunType[];
-}> = [
-  { name: "github-trending", collect: githubTrending.collect, runTypes: ["pulse", "digest", "deep_dive"] },
-  { name: "google-trends", collect: googleTrends.collect, runTypes: ["digest", "deep_dive"] },
-  { name: "tiktok", collect: tiktok.collect, runTypes: ["digest", "deep_dive"] },
-];
+// ─── Runner ──────────────────────────────────────────────────────
+
+async function runSources(sources: SourceDef[], runType: RunType): Promise<SourceResult[]> {
+  const results: SourceResult[] = [];
+
+  // Split into API (parallel) and browser (sequential)
+  const apiSources = sources.filter((s) => !s.browser);
+  const browserSources = sources.filter((s) => s.browser);
+
+  // Run API sources in parallel
+  if (apiSources.length > 0) {
+    const apiResults = await Promise.allSettled(
+      apiSources.map(async (s) => {
+        const start = Date.now();
+        const result = await s.collect(runType);
+        const duration = Date.now() - start;
+        const icon = result.status === "ok" ? "✅" : result.status === "skipped" ? "⏭️" : "❌";
+        console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
+        return result;
+      })
+    );
+    for (const r of apiResults) {
+      if (r.status === "fulfilled") results.push(r.value);
+    }
+  }
+
+  // Run browser sources sequentially
+  for (const s of browserSources) {
+    const start = Date.now();
+    const result = await s.collect(runType);
+    const duration = Date.now() - start;
+    const icon = result.status === "ok" ? "✅" : "❌";
+    console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
+    if (result.status === "error") {
+      console.log(`      Error: ${result.error}`);
+    }
+    results.push(result);
+    // Delay between browser scrapes
+    if (browserSources.indexOf(s) < browserSources.length - 1) {
+      const delay = 2000 + Math.random() * 3000;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+
+  return results;
+}
 
 async function main() {
   const args = process.argv.slice(2);
   const typeFlag = args.indexOf("--type");
+  const phaseFlag = args.indexOf("--phase");
   const runType: RunType = typeFlag >= 0 ? (args[typeFlag + 1] as RunType) : "digest";
+  const phase: Phase = phaseFlag >= 0 ? (args[phaseFlag + 1] as Phase) : "all";
 
   const outputDir = process.env.SCRAPER_OUTPUT_DIR ?? join(process.cwd(), "output");
   mkdirSync(outputDir, { recursive: true });
 
-  console.log(`\n🦞 TrendClaw Scraper — ${runType} run`);
+  // Load user profile (Supabase → file → defaults)
+  await initUserConfig();
+  const userConfig = getUserConfig();
+  console.log(`\n🦞 TrendClaw Scraper — ${runType} run (phase: ${phase})`);
   console.log(`   Output: ${outputDir}`);
+  console.log(`   Region: ${userConfig.region} | Niche: ${userConfig.niche} | Role: ${userConfig.role}`);
+  if (userConfig.keywords.length > 0) {
+    console.log(`   Keywords: ${userConfig.keywords.join(", ")}`);
+  }
   console.log(`   Time: ${new Date().toISOString()}\n`);
 
   const allResults: SourceResult[] = [];
 
-  // Phase 1: API sources (fast, run in parallel)
-  console.log("📡 Phase 1: Fetching API sources...");
-  const applicableAPIs = API_SOURCES.filter((s) => s.runTypes.includes(runType));
-  const apiResults = await Promise.allSettled(
-    applicableAPIs.map(async (s) => {
-      const start = Date.now();
-      const result = await s.collect(runType);
-      const duration = Date.now() - start;
-      const icon = result.status === "ok" ? "✅" : result.status === "skipped" ? "⏭️" : "❌";
-      console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
-      return result;
-    })
-  );
-  for (const r of apiResults) {
-    if (r.status === "fulfilled") allResults.push(r.value);
-  }
+  // Determine which phases to run
+  const phases: Array<"global" | "region" | "topic"> =
+    phase === "all" ? ["global", "region", "topic"] : [phase as "global" | "region" | "topic"];
 
-  // Phase 2: RSS feeds (fast, run in parallel)
-  console.log("\n📰 Phase 2: Fetching RSS feeds...");
-  const rssResults = await rss.collectAll(runType);
-  for (const r of rssResults) {
-    const icon = r.status === "ok" ? "✅" : "❌";
-    console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
-    allResults.push(r);
-  }
+  for (const p of phases) {
+    const label = p === "global" ? "🌍 Global sources" : p === "region" ? "🗺️  Region sources" : "🎯 Topic sources (personalized)";
+    console.log(`${label}...`);
 
-  // Phase 3: Browser sources (slow, run sequentially to avoid detection)
-  const applicableBrowser = BROWSER_SOURCES.filter((s) => s.runTypes.includes(runType));
-  if (applicableBrowser.length > 0) {
-    console.log("\n🌐 Phase 3: Browser scraping (stealth mode)...");
-    for (const s of applicableBrowser) {
-      const start = Date.now();
-      const result = await s.collect(runType);
-      const duration = Date.now() - start;
-      const icon = result.status === "ok" ? "✅" : "❌";
-      console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
-      if (result.status === "error") {
-        console.log(`      Error: ${result.error}`);
-      }
-      allResults.push(result);
-      // Delay between browser scrapes to look human
-      if (applicableBrowser.indexOf(s) < applicableBrowser.length - 1) {
-        const delay = 2000 + Math.random() * 3000;
-        await new Promise((r) => setTimeout(r, delay));
+    // Get applicable sources for this phase + run type
+    const applicable = SOURCES.filter(
+      (s) => s.phase === p && s.runTypes.includes(runType)
+    );
+
+    if (applicable.length === 0) {
+      console.log("   (no sources for this phase/run type)\n");
+      continue;
+    }
+
+    const results = await runSources(applicable, runType);
+    allResults.push(...results);
+
+    // Also collect RSS feeds for the appropriate phase
+    if (p === "global") {
+      console.log("\n📰 Global RSS feeds...");
+      const rssResults = await rss.collectGlobal(runType);
+      for (const r of rssResults) {
+        const icon = r.status === "ok" ? "✅" : "❌";
+        console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
+        allResults.push(r);
       }
     }
-    await closeBrowser();
+
+    if (p === "region") {
+      console.log("\n📰 Region RSS feeds...");
+      const rssResults = await rss.collectRegion(runType);
+      for (const r of rssResults) {
+        const icon = r.status === "ok" ? "✅" : "❌";
+        console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
+        allResults.push(r);
+      }
+    }
+
+    if (p === "topic") {
+      console.log("\n📰 Niche Reddit feeds...");
+      const nicheResults = await rss.collectByNiche(runType);
+      for (const r of nicheResults) {
+        const icon = r.status === "ok" ? "✅" : "❌";
+        console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
+        allResults.push(r);
+      }
+    }
+
+    console.log("");
   }
+
+  // Close browser if any browser sources were used
+  await closeBrowser();
 
   // Compile output
   const output: CollectedData = {
     runType,
+    phase: phase !== "all" ? phase : undefined,
     collectedAt: new Date().toISOString(),
     sources: allResults,
     totalItems: allResults.reduce((sum, r) => sum + r.items.length, 0),
@@ -121,15 +196,19 @@ async function main() {
       .map((r) => r.source),
   };
 
-  // Write output file
-  const filename = `latest-${runType}.json`;
+  // Write output file — use phase suffix if not running all
+  const suffix = phase !== "all" ? `-${phase}` : "";
+  const filename = `latest-${runType}${suffix}.json`;
   const filepath = join(outputDir, filename);
   writeFileSync(filepath, JSON.stringify(output, null, 2));
 
-  // Also write a "latest.json" symlink-style copy
-  writeFileSync(join(outputDir, "latest.json"), JSON.stringify(output, null, 2));
+  // Also write "latest.json" when running all phases
+  if (phase === "all") {
+    writeFileSync(join(outputDir, "latest.json"), JSON.stringify(output, null, 2));
+  }
 
-  console.log(`\n📊 Summary:`);
+  console.log(`📊 Summary:`);
+  console.log(`   Phase: ${phase}`);
   console.log(`   Total items: ${output.totalItems}`);
   console.log(`   Sources OK: ${allResults.filter((r) => r.status === "ok").length}/${allResults.length}`);
   console.log(`   Failed: ${output.failedSources.join(", ") || "none"}`);
