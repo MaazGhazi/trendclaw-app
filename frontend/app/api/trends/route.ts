@@ -1,30 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import fs from "fs";
-import path from "path";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const MAX_FILES = 100;
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function pruneOldFiles() {
-  const files = fs
-    .readdirSync(DATA_DIR)
-    .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run"))
-    .sort()
-    .reverse();
-
-  if (files.length > MAX_FILES) {
-    for (const file of files.slice(MAX_FILES)) {
-      fs.unlinkSync(path.join(DATA_DIR, file));
-    }
-  }
-}
 
 // POST — webhook receiver (kept for backward compatibility)
 export async function POST(request: NextRequest) {
@@ -43,41 +18,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const type = (body.type as string) || "pulse";
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `${type}-${timestamp}.json`;
+  const supabase = await createClient();
+  const { error } = await supabase.from("trend_runs").insert({
+    run_type: (body.type as string) || "pulse",
+    region: (body.region as string) || "global",
+    data: body,
+  });
 
-  ensureDataDir();
-  fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(body, null, 2));
-  pruneOldFiles();
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true, file: filename }, { status: 201 });
+  return NextResponse.json({ ok: true }, { status: 201 });
 }
 
-// GET — return latest trends for the logged-in user's region
+// GET — return latest trends from Supabase
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
 
-  if (!user) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    const { data: row, error } = await supabase
+      .from("trend_runs")
+      .select("id, run_type, region, data, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !row) {
+      return NextResponse.json({ error: "No trend data yet" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      file: `${row.run_type}-${row.id}`,
+      data: row.data?.data || row.data,
+      region: row.region || "global",
+    });
+  } catch {
+    return NextResponse.json({ error: "Failed to read trends" }, { status: 500 });
   }
-
-  // RLS policy filters by user's region automatically
-  const { data, error } = await supabase
-    .from("trend_runs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !data) {
-    return NextResponse.json({ error: "No trend data yet" }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    file: `${data.run_type}-${data.id}`,
-    data: data.data,
-    region: data.region,
-  });
 }

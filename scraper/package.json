@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "start": "node dist/index.js",
     "scrape": "node dist/index.js",
     "scrape:pulse": "node dist/index.js --type pulse",
     "scrape:digest": "node dist/index.js --type digest",
