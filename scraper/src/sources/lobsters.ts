@@ -3,7 +3,7 @@ import type { RunType, ScrapedItem, SourceResult } from "../types.js";
 export async function collect(runType: RunType): Promise<SourceResult> {
   try {
     const limit = runType === "pulse" ? 10 : 25;
-    const res = await fetch("https://lobste.rs/hottest.json");
+    const res = await fetch("https://lobste.rs/hottest.json", { signal: AbortSignal.timeout(15_000) });
     if (!res.ok) throw new Error(`Lobsters returned ${res.status}`);
     const stories = await res.json();
 

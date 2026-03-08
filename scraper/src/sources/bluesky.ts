@@ -9,7 +9,7 @@ export async function collect(_runType: RunType): Promise<SourceResult> {
 
   try {
     // Trending topics
-    const trendingRes = await fetch(`${BASE}/app.bsky.unspecced.getTrendingTopics`);
+    const trendingRes = await fetch(`${BASE}/app.bsky.unspecced.getTrendingTopics`, { signal: AbortSignal.timeout(15_000) });
     if (trendingRes.ok) {
       const data = await trendingRes.json();
       for (const topic of data.topics ?? []) {
@@ -27,7 +27,8 @@ export async function collect(_runType: RunType): Promise<SourceResult> {
     for (const q of queries) {
       try {
         const searchRes = await fetch(
-          `${BASE}/app.bsky.feed.searchPosts?q=${encodeURIComponent(q)}&sort=top&limit=5`
+          `${BASE}/app.bsky.feed.searchPosts?q=${encodeURIComponent(q)}&sort=top&limit=5`,
+          { signal: AbortSignal.timeout(15_000) }
         );
         if (searchRes.ok) {
           const data = await searchRes.json();
@@ -87,7 +88,8 @@ export async function collectByKeywords(_runType: RunType): Promise<SourceResult
     for (const keyword of keywords.slice(0, 5)) {
       try {
         const searchRes = await fetch(
-          `${BASE}/app.bsky.feed.searchPosts?q=${encodeURIComponent(keyword)}&sort=top&limit=10`
+          `${BASE}/app.bsky.feed.searchPosts?q=${encodeURIComponent(keyword)}&sort=top&limit=10`,
+          { signal: AbortSignal.timeout(15_000) }
         );
         if (searchRes.ok) {
           const data = await searchRes.json();

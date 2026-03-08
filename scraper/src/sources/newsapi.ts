@@ -22,7 +22,8 @@ export async function collect(runType: RunType): Promise<SourceResult> {
 
     // Top headlines (general)
     const topRes = await fetch(
-      `${BASE}/top-headlines?country=${region}&pageSize=15&apiKey=${apiKey}`
+      `${BASE}/top-headlines?country=${region}&pageSize=15&apiKey=${apiKey}`,
+      { signal: AbortSignal.timeout(15_000) }
     );
     if (topRes.ok) {
       const data = await topRes.json();
@@ -40,7 +41,8 @@ export async function collect(runType: RunType): Promise<SourceResult> {
     // Tech headlines (digest and deep dive)
     if (runType !== "pulse") {
       const techRes = await fetch(
-        `${BASE}/top-headlines?country=${region}&category=technology&pageSize=10&apiKey=${apiKey}`
+        `${BASE}/top-headlines?country=${region}&category=technology&pageSize=10&apiKey=${apiKey}`,
+        { signal: AbortSignal.timeout(15_000) }
       );
       if (techRes.ok) {
         const data = await techRes.json();
@@ -112,7 +114,8 @@ export async function collectByKeywords(runType: RunType): Promise<SourceResult>
     fromDate.setDate(fromDate.getDate() - 3);
 
     const res = await fetch(
-      `${BASE}/everything?q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=${pageSize}&from=${fromDate.toISOString().split("T")[0]}&apiKey=${apiKey}`
+      `${BASE}/everything?q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=${pageSize}&from=${fromDate.toISOString().split("T")[0]}&apiKey=${apiKey}`,
+      { signal: AbortSignal.timeout(15_000) }
     );
 
     if (!res.ok) throw new Error(`NewsAPI everything returned ${res.status}`);

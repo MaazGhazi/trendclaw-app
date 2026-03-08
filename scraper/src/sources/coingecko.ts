@@ -7,7 +7,7 @@ export async function collect(runType: RunType): Promise<SourceResult> {
 
   try {
     // Trending coins
-    const trendingRes = await fetch(`${BASE}/search/trending`);
+    const trendingRes = await fetch(`${BASE}/search/trending`, { signal: AbortSignal.timeout(15_000) });
     if (trendingRes.ok) {
       const data = await trendingRes.json();
       for (const coin of data.coins ?? []) {

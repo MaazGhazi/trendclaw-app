@@ -4,7 +4,7 @@ const BASE = "https://hacker-news.firebaseio.com/v0";
 
 async function fetchItem(id: number): Promise<ScrapedItem | null> {
   try {
-    const res = await fetch(`${BASE}/item/${id}.json`);
+    const res = await fetch(`${BASE}/item/${id}.json`, { signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return null;
     const item = await res.json();
     if (!item || item.dead || item.deleted) return null;
@@ -25,8 +25,8 @@ export async function collect(runType: RunType): Promise<SourceResult> {
 
   try {
     const [topRes, bestRes] = await Promise.all([
-      fetch(`${BASE}/topstories.json`),
-      fetch(`${BASE}/beststories.json`),
+      fetch(`${BASE}/topstories.json`, { signal: AbortSignal.timeout(15_000) }),
+      fetch(`${BASE}/beststories.json`, { signal: AbortSignal.timeout(15_000) }),
     ]);
     if (!topRes.ok) throw new Error(`HN top API returned ${topRes.status}`);
     if (!bestRes.ok) throw new Error(`HN best API returned ${bestRes.status}`);

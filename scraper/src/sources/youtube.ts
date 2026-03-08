@@ -20,7 +20,8 @@ export async function collect(runType: RunType): Promise<SourceResult> {
     const maxResults = runType === "pulse" ? 10 : 20;
     const region = getUserConfig().region;
     const res = await fetch(
-      `${BASE}/videos?part=snippet,statistics&chart=mostPopular&regionCode=${region}&maxResults=${maxResults}&key=${apiKey}`
+      `${BASE}/videos?part=snippet,statistics&chart=mostPopular&regionCode=${region}&maxResults=${maxResults}&key=${apiKey}`,
+      { signal: AbortSignal.timeout(15_000) }
     );
     if (!res.ok) throw new Error(`YouTube API returned ${res.status}`);
     const data = await res.json();
@@ -85,7 +86,8 @@ export async function collectByKeywords(runType: RunType): Promise<SourceResult>
 
     // Search for videos matching user's keywords, sorted by view count in last 24h
     const res = await fetch(
-      `${BASE}/search?part=snippet&q=${encodeURIComponent(query)}&type=video&regionCode=${region}&maxResults=${maxResults}&order=viewCount&publishedAfter=${recentDate()}&key=${apiKey}`
+      `${BASE}/search?part=snippet&q=${encodeURIComponent(query)}&type=video&regionCode=${region}&maxResults=${maxResults}&order=viewCount&publishedAfter=${recentDate()}&key=${apiKey}`,
+      { signal: AbortSignal.timeout(15_000) }
     );
     if (!res.ok) throw new Error(`YouTube Search API returned ${res.status}`);
     const data = await res.json();
@@ -102,7 +104,8 @@ export async function collectByKeywords(runType: RunType): Promise<SourceResult>
 
     // Fetch stats for all found videos
     const statsRes = await fetch(
-      `${BASE}/videos?part=statistics&id=${videoIds.join(",")}&key=${apiKey}`
+      `${BASE}/videos?part=statistics&id=${videoIds.join(",")}&key=${apiKey}`,
+      { signal: AbortSignal.timeout(15_000) }
     );
     const statsData = statsRes.ok ? await statsRes.json() : { items: [] };
     const statsMap = new Map<string, any>();

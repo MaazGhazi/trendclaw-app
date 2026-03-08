@@ -123,6 +123,7 @@ async function fetchFeed(feed: FeedConfig): Promise<SourceResult> {
   try {
     const res = await fetch(feed.url, {
       headers: { "User-Agent": "TrendClaw/1.0 (trend monitoring)" },
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`RSS returned ${res.status}`);
 

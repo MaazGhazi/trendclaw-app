@@ -27,7 +27,7 @@ export async function collect(runType: RunType): Promise<SourceResult> {
     const perPage = runType === "pulse" ? 10 : 20;
     const res = await fetch(
       `https://dev.to/api/articles?top=1&per_page=${perPage}`,
-      { headers: { "User-Agent": "TrendClaw/1.0" } }
+      { headers: { "User-Agent": "TrendClaw/1.0" }, signal: AbortSignal.timeout(15_000) }
     );
     if (!res.ok) throw new Error(`Dev.to API returned ${res.status}`);
     const articles = await res.json();
@@ -78,7 +78,7 @@ export async function collectByKeywords(runType: RunType): Promise<SourceResult>
     const perPage = runType === "pulse" ? 10 : 20;
     const res = await fetch(
       `https://dev.to/api/articles?tag=${encodeURIComponent(tag)}&top=1&per_page=${perPage}`,
-      { headers: { "User-Agent": "TrendClaw/1.0" } }
+      { headers: { "User-Agent": "TrendClaw/1.0" }, signal: AbortSignal.timeout(15_000) }
     );
     if (!res.ok) throw new Error(`Dev.to tag API returned ${res.status}`);
     const articles = await res.json();

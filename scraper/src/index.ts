@@ -58,6 +58,23 @@ const SOURCES: SourceDef[] = [
 
 // ─── Runner ──────────────────────────────────────────────────────
 
+const SOURCE_TIMEOUT_MS = 30_000; // 30s max per source
+
+function withTimeout(promise: Promise<SourceResult>, ms: number, name: string): Promise<SourceResult> {
+  return Promise.race([
+    promise,
+    new Promise<SourceResult>((resolve) =>
+      setTimeout(() => resolve({
+        source: name,
+        status: "error",
+        error: `Timed out after ${ms / 1000}s`,
+        items: [],
+        scrapedAt: new Date().toISOString(),
+      }), ms)
+    ),
+  ]);
+}
+
 async function runSources(sources: SourceDef[], runType: RunType): Promise<SourceResult[]> {
   const results: SourceResult[] = [];
 
@@ -65,12 +82,12 @@ async function runSources(sources: SourceDef[], runType: RunType): Promise<Sourc
   const apiSources = sources.filter((s) => !s.browser);
   const browserSources = sources.filter((s) => s.browser);
 
-  // Run API sources in parallel
+  // Run API sources in parallel (with per-source timeout)
   if (apiSources.length > 0) {
     const apiResults = await Promise.allSettled(
       apiSources.map(async (s) => {
         const start = Date.now();
-        const result = await s.collect(runType);
+        const result = await withTimeout(s.collect(runType), SOURCE_TIMEOUT_MS, s.name);
         const duration = Date.now() - start;
         const icon = result.status === "ok" ? "✅" : result.status === "skipped" ? "⏭️" : "❌";
         console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
@@ -82,10 +99,10 @@ async function runSources(sources: SourceDef[], runType: RunType): Promise<Sourc
     }
   }
 
-  // Run browser sources sequentially
+  // Run browser sources sequentially (with per-source timeout)
   for (const s of browserSources) {
     const start = Date.now();
-    const result = await s.collect(runType);
+    const result = await withTimeout(s.collect(runType), SOURCE_TIMEOUT_MS * 2, s.name);
     const duration = Date.now() - start;
     const icon = result.status === "ok" ? "✅" : "❌";
     console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
@@ -170,7 +187,14 @@ async function main() {
 
     if (p === "topic") {
       console.log("\n📰 Niche Reddit feeds...");
-      const nicheResults = await rss.collectByNiche(runType);
+      const nichePromise = rss.collectByNiche(runType);
+      const nicheTimeout = new Promise<SourceResult[]>((resolve) =>
+        setTimeout(() => {
+          console.log("   ⏰ Niche Reddit feeds timed out after 30s");
+          resolve([]);
+        }, SOURCE_TIMEOUT_MS)
+      );
+      const nicheResults = await Promise.race([nichePromise, nicheTimeout]);
       for (const r of nicheResults) {
         const icon = r.status === "ok" ? "✅" : "❌";
         console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
