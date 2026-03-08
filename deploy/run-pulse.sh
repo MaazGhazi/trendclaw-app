@@ -715,6 +715,23 @@ print(f'  ✓ Stored for user={user_id} region=$REGION niche=$NICHE')
 " 2>&1 || echo "  ✗ Supabase store failed"
   fi
 
+  # ── Also save to frontend local data dir for JSON file-based serving ───────
+  if [ -s "$FINAL_FILE" ]; then
+    FRONTEND_DATA="$FRONTEND_DIR/data"
+    mkdir -p "$FRONTEND_DATA"
+    TIMESTAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+    LOCAL_FILENAME="${TYPE}-${TIMESTAMP}.json"
+    python3 -c "
+import json
+with open('$FINAL_FILE') as f:
+    data = json.load(f)
+out = {'type': '$TYPE', 'region': '$REGION', 'created_at': '$TIMESTAMP', 'data': data}
+with open('$FRONTEND_DATA/$LOCAL_FILENAME', 'w') as f:
+    json.dump(out, f)
+print(f'  ✓ Saved to frontend/data/$LOCAL_FILENAME')
+" 2>&1 || echo "  ✗ Local file save failed"
+  fi
+
   COMPLETED_USERS=$((COMPLETED_USERS + 1))
   write_progress "
 p['steps']['users']['completed'] = $COMPLETED_USERS

@@ -1,70 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import fs from "fs";
+import path from "path";
 
 export async function GET(request: NextRequest) {
-  const fileParam = request.nextUrl.searchParams.get("file");
-
-  const supabase = await createClient();
+  const DATA_DIR = path.join(process.cwd(), "data");
+  const runId = request.nextUrl.searchParams.get("file");
 
   // If a specific run is requested, return its contents
-  if (fileParam) {
-    // fileParam could be "pulse-<id>" or just the raw id
-    // Extract id: strip leading "type-" prefix (pulse-, digest-, deep_dive-)
-    const id = fileParam.replace(/^(pulse|digest|deep_dive)-/, "");
+  if (runId) {
+    const filename = `${runId}.json`;
+    const filepath = path.join(DATA_DIR, filename);
 
-    const { data: row, error } = await supabase
-      .from("trend_runs")
-      .select("id, run_type, region, data, created_at")
-      .eq("id", id)
-      .single();
-
-    if (error || !row) {
+    if (!fs.existsSync(filepath)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      file: `${row.run_type}-${row.id}`,
-      data: row.data?.data || row.data,
-      region: row.region || "global",
-    });
+    try {
+      const content = fs.readFileSync(filepath, "utf-8");
+      const json = JSON.parse(content);
+      return NextResponse.json({
+        file: runId,
+        data: json.data || json,
+        region: json.region || "global",
+      });
+    } catch {
+      return NextResponse.json({ error: "Failed to read file" }, { status: 500 });
+    }
   }
 
-  // List all runs
+  // List all runs from JSON files
+  if (!fs.existsSync(DATA_DIR)) {
+    return NextResponse.json({ runs: [] });
+  }
+
   try {
-    const { data: rows, error } = await supabase
-      .from("trend_runs")
-      .select("id, run_type, region, data, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100);
+    const files = fs
+      .readdirSync(DATA_DIR)
+      .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run") && !f.startsWith("queue"))
+      .sort()
+      .reverse();
 
-    if (error) {
-      return NextResponse.json({ runs: [] });
-    }
+    const enrichedRuns = files.map((file) => {
+      try {
+        const content = fs.readFileSync(path.join(DATA_DIR, file), "utf-8");
+        const json = JSON.parse(content);
+        const categories = json.data?.categories || json.categories || [];
+        const trendCount = categories.reduce(
+          (sum: number, cat: { trends?: unknown[] }) => sum + (cat.trends?.length || 0),
+          0
+        );
+        const sourcesOk = json.data?.data_quality?.sources_ok ?? json.data_quality?.sources_ok ?? 0;
+        const totalItems = json.data?.data_quality?.total_raw_items ?? json.data_quality?.total_raw_items ?? 0;
+        const failed = !!json.parse_error || (trendCount === 0 && sourcesOk === 0);
 
-    const enrichedRuns = (rows || []).map((row) => {
-      const data = row.data?.data || row.data;
-      const categories = data?.categories || [];
-      const trendCount = categories.reduce(
-        (sum: number, cat: { trends?: unknown[] }) => sum + (cat.trends?.length || 0),
-        0
-      );
-      const sourcesOk = data?.data_quality?.sources_ok ?? 0;
-      const totalItems = data?.data_quality?.total_raw_items ?? 0;
-      const failed = trendCount === 0 && sourcesOk === 0;
-
-      return {
-        file: `${row.run_type}-${row.id}`,
-        type: row.run_type,
-        region: row.region || "global",
-        created: row.created_at,
-        data_quality: {
-          sources_ok: sourcesOk,
-          total_items: totalItems,
-          trend_count: trendCount,
-        },
-        failed,
-      };
-    });
+        return {
+          file: file.replace(".json", ""),
+          type: json.type || file.split("-")[0],
+          region: json.region || "global",
+          created: json.created_at || new Date(fs.statSync(path.join(DATA_DIR, file)).mtime).toISOString(),
+          data_quality: {
+            sources_ok: sourcesOk,
+            total_items: totalItems,
+            trend_count: trendCount,
+          },
+          failed,
+        };
+      } catch {
+        return null;
+      }
+    }).filter(Boolean);
 
     return NextResponse.json({ runs: enrichedRuns });
   } catch {
