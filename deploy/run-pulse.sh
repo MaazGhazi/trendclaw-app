@@ -8,10 +8,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 { set +x; } 2>/dev/null
 set -a
+# Source both env files — openclaw first, project .env overrides
+if [ -f ~/.openclaw/.env ]; then
+  source ~/.openclaw/.env
+fi
 if [ -f "$PROJECT_DIR/.env" ]; then
   source "$PROJECT_DIR/.env"
-elif [ -f ~/.openclaw/.env ]; then
-  source ~/.openclaw/.env
 fi
 set +a
 
