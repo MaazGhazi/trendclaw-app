@@ -15,8 +15,9 @@ function pruneOldFiles() {
   const files = fs
     .readdirSync(DATA_DIR)
     .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run") && !f.startsWith("queue"))
-    .sort()
-    .reverse();
+    .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)
+    .map((f) => f.name);
 
   if (files.length > MAX_FILES) {
     for (const file of files.slice(MAX_FILES)) {
@@ -60,11 +61,14 @@ export async function GET() {
   }
 
   try {
+    // Sort by file modification time (newest first) — NOT alphabetically,
+    // since "pulse" > "deep_dive" alphabetically which returns stale data
     const files = fs
       .readdirSync(DATA_DIR)
       .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run") && !f.startsWith("queue"))
-      .sort()
-      .reverse();
+      .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime)
+      .map((f) => f.name);
 
     if (files.length === 0) {
       return NextResponse.json({ error: "No trend data yet" }, { status: 404 });

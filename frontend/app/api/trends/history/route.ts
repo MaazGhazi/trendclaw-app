@@ -37,8 +37,9 @@ export async function GET(request: NextRequest) {
     const files = fs
       .readdirSync(DATA_DIR)
       .filter((f) => f.endsWith(".json") && !f.startsWith("progress") && !f.startsWith("run") && !f.startsWith("queue"))
-      .sort()
-      .reverse();
+      .map((f) => ({ name: f, mtime: fs.statSync(path.join(DATA_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime)
+      .map((f) => f.name);
 
     const enrichedRuns = files.map((file) => {
       try {
