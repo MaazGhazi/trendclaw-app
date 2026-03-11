@@ -82,8 +82,8 @@ function getRunning(): RunningJob | null {
 
 function startJob(jobId: string, type: string): number {
   const scriptPath = path.join(
-    process.env.HOME || "/root",
-    "trendclaw-app",
+    process.cwd(),
+    "..",
     "deploy",
     "run-pulse.sh"
   );

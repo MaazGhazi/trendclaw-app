@@ -2,15 +2,22 @@
 set -uo pipefail
 
 # Load env (set -a exports all sourced vars to child processes like node)
+# Try project .env first, fall back to ~/.openclaw/.env (droplet)
 set -a
-source ~/.openclaw/.env
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+if [ -f "$PROJECT_DIR/.env" ]; then
+  source "$PROJECT_DIR/.env"
+elif [ -f ~/.openclaw/.env ]; then
+  source ~/.openclaw/.env
+fi
 set +a
 
 TYPE="${1:-pulse}"
-SCRAPER_DIR="$HOME/trendclaw-app/scraper"
+SCRAPER_DIR="$PROJECT_DIR/scraper"
 SCRAPER_OUTPUT="${SCRAPER_OUTPUT_DIR:-$SCRAPER_DIR/output}"
 MEMORY_DIR="$HOME/.openclaw/workspace/memory"
-FRONTEND_DIR="$HOME/trendclaw-app/frontend"
+FRONTEND_DIR="$PROJECT_DIR/frontend"
 PROGRESS_FILE="$FRONTEND_DIR/data/progress.json"
 RUN_ID="${TYPE}-$(date +%s)"
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
