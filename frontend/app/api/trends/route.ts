@@ -74,12 +74,22 @@ export async function GET() {
     const content = fs.readFileSync(path.join(DATA_DIR, latestFile), "utf-8");
     const json = JSON.parse(content);
 
-    return NextResponse.json({
-      file: latestFile.replace(".json", ""),
-      data: json.data || json,
-      region: json.region || "global",
-    });
-  } catch {
-    return NextResponse.json({ error: "Failed to read trends" }, { status: 500 });
+    return NextResponse.json(
+      {
+        file: latestFile.replace(".json", ""),
+        data: json.data || json,
+        region: json.region || "global",
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { error: "Failed to read trends", detail: String(e) },
+      { status: 500 }
+    );
   }
 }

@@ -8,25 +8,34 @@ export async function getBrowser(): Promise<BrowserContext> {
 
   const proxyUrl = process.env.PROXY_URL; // e.g. http://user:pass@proxy.scraperapi.com:8001
 
-  browser = await chromium.launch({
-    headless: true,
-    args: [
-      "--disable-blink-features=AutomationControlled",
-      "--disable-dev-shm-usage",
-      "--no-sandbox",
-    ],
-    ...(proxyUrl ? { proxy: { server: proxyUrl } } : {}),
-  });
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+      ],
+      ...(proxyUrl ? { proxy: { server: proxyUrl } } : {}),
+    });
 
-  context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-    viewport: { width: 1440, height: 900 },
-    locale: "en-US",
-    timezoneId: "America/New_York",
-    // Stealth: override webdriver detection
-    bypassCSP: true,
-  });
+    context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+      viewport: { width: 1440, height: 900 },
+      locale: "en-US",
+      timezoneId: "America/New_York",
+      // Stealth: override webdriver detection
+      bypassCSP: true,
+    });
+  } catch (e) {
+    // Clean up partial state if context creation failed after browser launched
+    if (browser && !context) {
+      try { await browser.close(); } catch { /* ignore */ }
+      browser = null;
+    }
+    throw e;
+  }
 
   // Stealth patches
   await context.addInitScript(() => {
@@ -80,13 +89,31 @@ export async function newPage(): Promise<Page> {
   return page;
 }
 
+/** Safely close a page — never throws */
+export async function safeClosePage(page: Page | null): Promise<void> {
+  if (!page) return;
+  try {
+    await page.close();
+  } catch {
+    // Page may already be closed or browser crashed — ignore
+  }
+}
+
 export async function closeBrowser(): Promise<void> {
-  if (context) {
-    await context.close();
+  try {
+    if (context) {
+      await context.close();
+      context = null;
+    }
+  } catch {
     context = null;
   }
-  if (browser) {
-    await browser.close();
+  try {
+    if (browser) {
+      await browser.close();
+      browser = null;
+    }
+  } catch {
     browser = null;
   }
 }

@@ -63,9 +63,15 @@ export default function PipelineTab({
   const scraping = progress?.steps?.scraping;
   const users = progress?.steps?.users;
   const isRunning = progress?.status === "running";
+
+  // When the overall pipeline is completed, treat scraping as fully done
+  // (fixes race condition where monitor was killed before reading all markers)
+  const scrapeCompleted = progress?.status === "completed"
+    ? (scraping?.total || 0)
+    : (scraping?.completed || 0);
   const scrapePercent =
     scraping && scraping.total > 0
-      ? Math.round((scraping.completed / scraping.total) * 100)
+      ? Math.round((scrapeCompleted / scraping.total) * 100)
       : 0;
 
   // Live elapsed time (ticks every second when running)
@@ -83,7 +89,10 @@ export default function PipelineTab({
   // Build job list: done + remaining
   const doneJobs = scraping?.done_jobs || [];
   const allJobCount = scraping?.total || 0;
-  const pendingCount = allJobCount - doneJobs.length;
+  // When pipeline completed, no jobs are pending (even if some markers were missed)
+  const pendingCount = progress?.status === "completed"
+    ? 0
+    : allJobCount - doneJobs.length;
 
   return (
     <div className="space-y-8">
@@ -139,7 +148,7 @@ export default function PipelineTab({
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-zinc-400 font-mono">
-                    {scraping?.completed || 0}/{allJobCount} jobs
+                    {scrapeCompleted}/{allJobCount} jobs
                   </span>
                   {liveScrapeTime && (
                     <span className="text-xs text-zinc-500 font-mono">

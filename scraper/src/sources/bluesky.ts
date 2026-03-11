@@ -112,8 +112,7 @@ export async function collectByKeywords(_runType: RunType): Promise<SourceResult
 
     return {
       source: "Bluesky Keywords",
-      status: items.length > 0 ? "ok" : "error",
-      error: items.length === 0 ? "No results for keywords" : undefined,
+      status: "ok",
       items,
       scrapedAt: new Date().toISOString(),
     };

@@ -1,4 +1,4 @@
-import { newPage } from "./browser.js";
+import { newPage, safeClosePage } from "./browser.js";
 import type { RunType, ScrapedItem, SourceResult } from "../types.js";
 import { getUserConfig } from "../user-config.js";
 
@@ -194,7 +194,7 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
       }
     }
   } finally {
-    await page.close();
+    await safeClosePage(page);
   }
 
   return items;

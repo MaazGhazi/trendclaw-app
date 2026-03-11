@@ -1,11 +1,12 @@
-import { newPage } from "./browser.js";
+import { newPage, safeClosePage } from "./browser.js";
 import type { RunType, ScrapedItem, SourceResult } from "../types.js";
 
 export async function collect(runType: RunType): Promise<SourceResult> {
   const items: ScrapedItem[] = [];
+  let page: Awaited<ReturnType<typeof newPage>> | null = null;
 
   try {
-    const page = await newPage();
+    page = await newPage();
 
     // Today's trending
     await page.goto("https://github.com/trending", {
@@ -48,8 +49,6 @@ export async function collect(runType: RunType): Promise<SourceResult> {
       }
     }
 
-    await page.close();
-
     return {
       source: "GitHub Trending",
       status: items.length > 0 ? "ok" : "error",
@@ -65,5 +64,7 @@ export async function collect(runType: RunType): Promise<SourceResult> {
       items,
       scrapedAt: new Date().toISOString(),
     };
+  } finally {
+    await safeClosePage(page);
   }
 }

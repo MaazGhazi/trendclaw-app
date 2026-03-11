@@ -99,10 +99,22 @@ async function runSources(sources: SourceDef[], runType: RunType): Promise<Sourc
     }
   }
 
-  // Run browser sources sequentially (with per-source timeout)
+  // Run browser sources sequentially (with per-source timeout + extra safety)
   for (const s of browserSources) {
     const start = Date.now();
-    const result = await withTimeout(s.collect(runType), SOURCE_TIMEOUT_MS * 2, s.name);
+    let result: SourceResult;
+    try {
+      result = await withTimeout(s.collect(runType), SOURCE_TIMEOUT_MS * 2, s.name);
+    } catch (e) {
+      // Catch any unhandled errors that escaped the source's own try/catch
+      result = {
+        source: s.name,
+        status: "error",
+        error: `Uncaught: ${String(e)}`,
+        items: [],
+        scrapedAt: new Date().toISOString(),
+      };
+    }
     const duration = Date.now() - start;
     const icon = result.status === "ok" ? "✅" : "❌";
     console.log(`   ${icon} ${result.source}: ${result.items.length} items (${duration}ms)`);
@@ -238,6 +250,11 @@ async function main() {
   console.log(`   Failed: ${output.failedSources.join(", ") || "none"}`);
   console.log(`   Output: ${filepath}\n`);
 }
+
+// Prevent unhandled rejections from crashing the process silently
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection (caught at process level):", reason);
+});
 
 main().catch((e) => {
   console.error("Fatal error:", e);

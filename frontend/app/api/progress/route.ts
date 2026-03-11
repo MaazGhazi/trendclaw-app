@@ -15,7 +15,9 @@ export async function GET() {
   try {
     const content = fs.readFileSync(PROGRESS_FILE, "utf-8");
     const data = JSON.parse(content);
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
   } catch {
     return NextResponse.json(
       { error: "Failed to read progress data" },

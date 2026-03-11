@@ -267,13 +267,56 @@ with open(pf, 'w') as f:
 ) &
 MONITOR_PID=$!
 
-# ── Wait for ALL scrapes to finish ──────────────────────────────────────────
+# ── Wait for ALL scrapes to finish (with timeout) ──────────────────────────
+SCRAPE_TIMEOUT=300  # 5 minutes max for all scrapes
+
+(
+  sleep $SCRAPE_TIMEOUT
+  echo "[$(date -u +%H:%M:%S)] ⚠️  Scrape timeout (${SCRAPE_TIMEOUT}s) — killing remaining jobs"
+  for pid in $SCRAPE_PIDS; do
+    kill "$pid" 2>/dev/null || true
+  done
+) &
+TIMEOUT_PID=$!
+
 for pid in $SCRAPE_PIDS; do
   wait "$pid" 2>/dev/null || true
 done
 
+# Cancel the timeout watcher (scrapes finished in time)
+kill $TIMEOUT_PID 2>/dev/null; wait $TIMEOUT_PID 2>/dev/null || true
+
 # Stop the progress monitor
 kill $MONITOR_PID 2>/dev/null; wait $MONITOR_PID 2>/dev/null || true
+
+# ── Final marker scan — catches any markers the monitor missed ─────────────
+python3 -c "
+import json, os, glob
+pf = '$PROGRESS_FILE'
+markers = '$MARKERS_DIR'
+try:
+    with open(pf) as f:
+        p = json.load(f)
+except:
+    p = {'run_id': '$RUN_ID', 'type': '$TYPE', 'started_at': '$STARTED_AT', 'status': 'running', 'steps': {'scraping': {}, 'users': {'status': 'pending', 'total': 0, 'completed': 0}}}
+done_jobs = []
+source_details = {}
+for mf in sorted(glob.glob(os.path.join(markers, '*.done'))):
+    job = os.path.basename(mf).replace('.done', '')
+    done_jobs.append(job)
+    try:
+        with open(mf) as f:
+            data = json.load(f)
+        source_details[job] = data.get('sources', [])
+    except:
+        source_details[job] = []
+p['steps']['scraping']['completed'] = len(done_jobs)
+p['steps']['scraping']['total'] = $TOTAL_SCRAPE_JOBS
+p['steps']['scraping']['done_jobs'] = done_jobs
+p['steps']['scraping']['source_details'] = source_details
+with open(pf, 'w') as f:
+    json.dump(p, f)
+" 2>/dev/null || true
 
 SCRAPE_ELAPSED=$(($(date +%s) - SCRAPE_START))
 echo "[$(date -u +%H:%M:%S)] All scrapes done (${SCRAPE_ELAPSED}s — ran in parallel)"
@@ -312,6 +355,7 @@ echo "[$(date -u +%H:%M:%S)] Global: $GLOBAL_ITEMS items collected"
 write_progress "
 p['steps']['scraping']['status'] = 'completed'
 p['steps']['scraping']['duration_s'] = $SCRAPE_ELAPSED
+p['steps']['scraping']['completed'] = $TOTAL_SCRAPE_JOBS
 p['steps']['users']['status'] = 'running'
 "
 
