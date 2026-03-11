@@ -31,11 +31,18 @@ export interface TrendData {
 
 // --- Pipeline / progress types ---
 
+export interface SourceDetail {
+  name: string;
+  status: "ok" | "error" | "skipped";
+  items: number;
+}
+
 export interface ScrapingStep {
   status: "pending" | "running" | "completed";
   total: number;
   completed: number;
   done_jobs?: string[];
+  source_details?: Record<string, SourceDetail[]>;
   duration_s?: number;
   detail?: string;
 }

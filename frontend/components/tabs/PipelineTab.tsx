@@ -1,6 +1,7 @@
 "use client";
 
-import type { ProgressData, HistoryRun, QueueData } from "@/lib/types";
+import { useState, useEffect } from "react";
+import type { ProgressData, HistoryRun, QueueData, SourceDetail } from "@/lib/types";
 import { TYPE_LABELS, TYPE_COLORS, USER_STEP_LABELS, USER_STEP_ORDER } from "@/lib/types";
 import { formatAge } from "@/lib/hooks";
 import StatusIcon from "@/components/StatusIcon";
@@ -37,6 +38,12 @@ function jobTypeIcon(name: string): string {
   return "📦";
 }
 
+function formatDuration(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
 export default function PipelineTab({
   progress,
   progressError,
@@ -45,12 +52,33 @@ export default function PipelineTab({
   recentRuns,
   onViewRun,
 }: PipelineTabProps) {
+  // Real-time tick for live timers
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (progress?.status !== "running") return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [progress?.status]);
+
   const scraping = progress?.steps?.scraping;
   const users = progress?.steps?.users;
+  const isRunning = progress?.status === "running";
   const scrapePercent =
     scraping && scraping.total > 0
       ? Math.round((scraping.completed / scraping.total) * 100)
       : 0;
+
+  // Live elapsed time (ticks every second when running)
+  const liveElapsed = isRunning && progress?.started_at
+    ? formatDuration(now - new Date(progress.started_at).getTime())
+    : elapsed;
+
+  // Live scraping duration (ticks when scraping is active, shows final duration_s when done)
+  const liveScrapeTime = scraping?.status === "running" && progress?.started_at
+    ? ((now - new Date(progress.started_at).getTime()) / 1000).toFixed(1) + "s"
+    : scraping?.duration_s != null
+      ? scraping.duration_s.toFixed(1) + "s"
+      : null;
 
   // Build job list: done + remaining
   const doneJobs = scraping?.done_jobs || [];
@@ -86,8 +114,8 @@ export default function PipelineTab({
               <span className="text-xs text-zinc-500">
                 Started {new Date(progress.started_at).toLocaleTimeString()}
               </span>
-              {elapsed && (
-                <span className="text-xs text-zinc-400 font-mono">{elapsed}</span>
+              {liveElapsed && (
+                <span className="text-xs text-zinc-400 font-mono">{liveElapsed}</span>
               )}
               <span
                 className={`text-xs font-medium capitalize ml-auto ${overallStatusColor[progress.status] || "text-zinc-400"}`}
@@ -113,9 +141,9 @@ export default function PipelineTab({
                   <span className="text-xs text-zinc-400 font-mono">
                     {scraping?.completed || 0}/{allJobCount} jobs
                   </span>
-                  {scraping?.duration_s != null && (
+                  {liveScrapeTime && (
                     <span className="text-xs text-zinc-500 font-mono">
-                      {scraping.duration_s.toFixed(1)}s
+                      {liveScrapeTime}
                     </span>
                   )}
                 </div>
@@ -140,26 +168,57 @@ export default function PipelineTab({
                   </div>
                 </div>
 
-                {/* Job cards grid */}
+                {/* Job cards with per-source details */}
                 {allJobCount > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {/* Completed jobs */}
-                    {doneJobs.map((job) => (
-                      <div
-                        key={job}
-                        className="flex items-center gap-2 rounded-lg border border-emerald-800/40 bg-emerald-950/20 px-3 py-2"
-                      >
-                        <StatusIcon status="completed" />
-                        <div className="min-w-0">
-                          <span className="text-xs font-medium text-zinc-200 block truncate">
-                            {formatJobName(job)}
-                          </span>
-                          <span className="text-[10px] text-zinc-500">
-                            {jobTypeIcon(job)} done
-                          </span>
+                  <div className="space-y-2">
+                    {/* Completed jobs — expanded with sources */}
+                    {doneJobs.map((job) => {
+                      const sources: SourceDetail[] = scraping?.source_details?.[job] || [];
+                      const okCount = sources.filter((s) => s.status === "ok").length;
+                      const totalItems = sources.reduce((sum, s) => sum + s.items, 0);
+                      return (
+                        <div
+                          key={job}
+                          className="rounded-lg border border-emerald-800/40 bg-emerald-950/10 overflow-hidden"
+                        >
+                          {/* Job header */}
+                          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-950/20">
+                            <StatusIcon status="completed" />
+                            <span className="text-xs font-medium text-zinc-200">
+                              {jobTypeIcon(job)} {formatJobName(job)}
+                            </span>
+                            {sources.length > 0 && (
+                              <span className="text-[10px] text-zinc-500 ml-auto">
+                                {okCount}/{sources.length} sources &middot; {totalItems} items
+                              </span>
+                            )}
+                          </div>
+                          {/* Per-source breakdown */}
+                          {sources.length > 0 && (
+                            <div className="px-3 py-2 flex flex-wrap gap-1.5">
+                              {sources.map((src) => (
+                                <span
+                                  key={src.name}
+                                  className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${
+                                    src.status === "ok"
+                                      ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-300"
+                                      : src.status === "skipped"
+                                        ? "border-zinc-700/50 bg-zinc-900/30 text-zinc-500"
+                                        : "border-red-800/50 bg-red-950/30 text-red-300"
+                                  }`}
+                                >
+                                  <span>{src.status === "ok" ? "✓" : src.status === "skipped" ? "–" : "✗"}</span>
+                                  <span>{src.name}</span>
+                                  {src.status === "ok" && src.items > 0 && (
+                                    <span className="text-emerald-500">{src.items}</span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {/* Remaining jobs (running) */}
                     {Array.from({ length: pendingCount }).map((_, i) => (
                       <div
@@ -168,10 +227,10 @@ export default function PipelineTab({
                       >
                         <StatusIcon status="running" />
                         <div className="min-w-0">
-                          <span className="text-xs font-medium text-zinc-300 block truncate">
+                          <span className="text-xs font-medium text-zinc-300">
                             Scraping...
                           </span>
-                          <span className="text-[10px] text-zinc-500">
+                          <span className="text-[10px] text-zinc-500 ml-2">
                             in progress
                           </span>
                         </div>

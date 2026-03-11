@@ -3,9 +3,11 @@ set -uo pipefail
 
 # Load env (set -a exports all sourced vars to child processes like node)
 # Try project .env first, fall back to ~/.openclaw/.env (droplet)
-set -a
+# Disable trace to prevent secrets from leaking in debug output
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+{ set +x; } 2>/dev/null
+set -a
 if [ -f "$PROJECT_DIR/.env" ]; then
   source "$PROJECT_DIR/.env"
 elif [ -f ~/.openclaw/.env ]; then
@@ -137,7 +139,17 @@ GLOBAL_OUTPUT="$SCRAPER_OUTPUT/latest-${TYPE}-global.json"
   cd "$SCRAPER_DIR"
   echo "[$(date -u +%H:%M:%S)] [global] Starting..."
   SCRAPER_OUTPUT_DIR="$SCRAPER_OUTPUT" node dist/index.js --type "$TYPE" --phase global 2>&1 || true
-  echo "done" > "$MARKERS_DIR/global.done"
+  # Write per-source details to marker file
+  python3 -c "
+import json
+try:
+    with open('$SCRAPER_OUTPUT/latest-${TYPE}-global.json') as f:
+        d = json.load(f)
+    sources = [{'name':s.get('source',''),'status':s.get('status','error'),'items':len(s.get('items',[]))} for s in d.get('sources',[])]
+except: sources = []
+with open('$MARKERS_DIR/global.done','w') as f:
+    json.dump({'sources':sources},f)
+" 2>/dev/null || echo '{"sources":[]}' > "$MARKERS_DIR/global.done"
   echo "[$(date -u +%H:%M:%S)] [global] Done"
 ) > /tmp/trendclaw-log-global.txt 2>&1 &
 SCRAPE_PIDS="$SCRAPE_PIDS $!"
@@ -155,7 +167,16 @@ for REGION in $REGIONS; do
     echo "[$(date -u +%H:%M:%S)] [region:$REGION] Starting..."
     SCRAPER_USER_CONFIG="$REGION_CONFIG" SCRAPER_OUTPUT_DIR="$REGION_OUT" \
       node dist/index.js --type "$TYPE" --phase region 2>&1 || true
-    echo "done" > "$MARKERS_DIR/region-${REGION}.done"
+    python3 -c "
+import json
+try:
+    with open('$REGION_OUT/latest-${TYPE}-region.json') as f:
+        d = json.load(f)
+    sources = [{'name':s.get('source',''),'status':s.get('status','error'),'items':len(s.get('items',[]))} for s in d.get('sources',[])]
+except: sources = []
+with open('$MARKERS_DIR/region-${REGION}.done','w') as f:
+    json.dump({'sources':sources},f)
+" 2>/dev/null || echo '{"sources":[]}' > "$MARKERS_DIR/region-${REGION}.done"
     echo "[$(date -u +%H:%M:%S)] [region:$REGION] Done"
   ) > "/tmp/trendclaw-log-region-${REGION}.txt" 2>&1 &
   SCRAPE_PIDS="$SCRAPE_PIDS $!"
@@ -189,7 +210,16 @@ while IFS= read -r user_json; do
       echo '{"runType":"'"$TYPE"'","phase":"topic","collectedAt":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","sources":[],"totalItems":0,"failedSources":[]}' \
         > "$USER_TMP/latest-${TYPE}-topic.json"
     fi
-    echo "done" > "$MARKERS_DIR/topic-${USER_ID}.done"
+    python3 -c "
+import json
+try:
+    with open('$USER_TMP/latest-${TYPE}-topic.json') as f:
+        d = json.load(f)
+    sources = [{'name':s.get('source',''),'status':s.get('status','error'),'items':len(s.get('items',[]))} for s in d.get('sources',[])]
+except: sources = []
+with open('$MARKERS_DIR/topic-${USER_ID}.done','w') as f:
+    json.dump({'sources':sources},f)
+" 2>/dev/null || echo '{"sources":[]}' > "$MARKERS_DIR/topic-${USER_ID}.done"
     echo "[$(date -u +%H:%M:%S)] [topic:$USER_ID] Done"
   ) > "/tmp/trendclaw-log-topic-${USER_ID}.txt" 2>&1 &
   SCRAPE_PIDS="$SCRAPE_PIDS $!"
@@ -202,23 +232,35 @@ echo ""
 echo "[$(date -u +%H:%M:%S)] All $TOTAL_SCRAPE_JOBS scrapes launched — monitoring progress..."
 (
   while true; do
-    DONE=$(find "$MARKERS_DIR" -name "*.done" 2>/dev/null | wc -l | tr -d ' ')
-    DONE_NAMES=$(ls "$MARKERS_DIR"/*.done 2>/dev/null | xargs -I{} basename {} .done | sort | tr '\n' ',' | sed 's/,$//' || echo "")
     python3 -c "
-import json, os
+import json, os, glob
 pf = '$PROGRESS_FILE'
+markers = '$MARKERS_DIR'
 try:
     with open(pf) as f:
         p = json.load(f)
 except:
     p = {'run_id': '$RUN_ID', 'type': '$TYPE', 'started_at': '$STARTED_AT', 'status': 'running', 'steps': {'scraping': {}, 'users': {'status': 'pending', 'total': 0, 'completed': 0}}}
+done_jobs = []
+source_details = {}
+for mf in sorted(glob.glob(os.path.join(markers, '*.done'))):
+    job = os.path.basename(mf).replace('.done', '')
+    done_jobs.append(job)
+    try:
+        with open(mf) as f:
+            data = json.load(f)
+        source_details[job] = data.get('sources', [])
+    except:
+        source_details[job] = []
 p['steps']['scraping']['status'] = 'running'
-p['steps']['scraping']['completed'] = int('$DONE')
+p['steps']['scraping']['completed'] = len(done_jobs)
 p['steps']['scraping']['total'] = $TOTAL_SCRAPE_JOBS
-p['steps']['scraping']['done_jobs'] = [x for x in '$DONE_NAMES'.split(',') if x]
+p['steps']['scraping']['done_jobs'] = done_jobs
+p['steps']['scraping']['source_details'] = source_details
 with open(pf, 'w') as f:
     json.dump(p, f)
 " 2>/dev/null
+    DONE=$(find "$MARKERS_DIR" -name "*.done" 2>/dev/null | wc -l | tr -d ' ')
     [ "$DONE" -ge "$TOTAL_SCRAPE_JOBS" ] && break
     sleep 2
   done
