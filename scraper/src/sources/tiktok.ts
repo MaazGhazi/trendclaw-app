@@ -142,9 +142,11 @@ async function fetchEndpoint(config: EndpointConfig): Promise<ScrapedItem[]> {
 
 async function collectViaPlaywright(): Promise<ScrapedItem[]> {
   const items: ScrapedItem[] = [];
-  const page = await newPage();
+  const seen = new Set<string>();
+  let page: Awaited<ReturnType<typeof newPage>> | null = null;
 
   try {
+    page = await newPage();
     await page.goto(
       "https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en",
       { waitUntil: "networkidle", timeout: 45000 }
@@ -154,28 +156,47 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
     await page.mouse.wheel(0, 500);
     await page.waitForTimeout(1500);
 
-    const rows = await page.$$(
-      "tr[class*='Row'], div[class*='hashtag-card'], div[class*='CardPc']"
-    );
+    // Current layout uses card-based <a> elements with CardPc_container class
+    // Each card's textContent looks like: "1# aidetector7KPostsNo related creatorSee analytics"
+    const cards = await page.$$("a[class*='CardPc_container']");
 
-    for (const row of rows.slice(0, 20)) {
+    for (const card of cards.slice(0, 30)) {
       try {
-        const text = (await row.textContent())?.trim() ?? "";
+        const text = (await card.textContent())?.trim() ?? "";
         if (text.length < 5) continue;
 
-        const lines = text
-          .split("\n")
-          .map((l) => l.trim())
-          .filter((l) => l.length > 0);
-        const title = lines.find((l) => l.startsWith("#")) ?? lines[0];
-        const viewsLine = lines.find(
-          (l) => l.includes("views") || l.includes("posts") || /\d+[KMB]/.test(l)
-        );
+        // Extract hashtag name: find # then take text until the post count
+        const hashIdx = text.indexOf("#");
+        if (hashIdx < 0) continue;
+
+        // Find post count: "7KPosts", "20KPosts", "1.5MPosts" etc.
+        // Use limited digit match to avoid capturing digits in hashtag names
+        const postsMatch = text.match(/(\d{1,4}(?:\.\d{1,2})?[KMB])\s*Posts/i);
+        let name: string;
+        let countStr: string | undefined;
+
+        if (postsMatch && postsMatch.index !== undefined) {
+          // Name is between # and the count
+          name = text.slice(hashIdx + 1, postsMatch.index).trim().toLowerCase();
+          countStr = postsMatch[1];
+        } else {
+          // No count found — just extract the hashtag name (letters/digits until junk)
+          const nameMatch = text.slice(hashIdx + 1).match(/^\s*(\w+)/);
+          if (!nameMatch) continue;
+          name = nameMatch[1].toLowerCase();
+        }
+
+        if (!name || name.length < 2 || seen.has(name)) continue;
+        seen.add(name);
+
+        // Try to get the card URL for linking
+        const href = await card.getAttribute("href");
 
         items.push({
-          title: title ?? text.slice(0, 80),
-          description: viewsLine,
-          views: parseViewCount(viewsLine),
+          title: `#${name}`,
+          url: href ? (href.startsWith("http") ? href : `https://ads.tiktok.com${href}`) : undefined,
+          description: countStr ? `${countStr} posts` : undefined,
+          views: countStr ? parseViewCount(countStr) : undefined,
           category: "hashtag",
         });
       } catch {
@@ -183,12 +204,55 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
       }
     }
 
+    // Fallback: try broader card wrapper selectors
+    if (items.length === 0) {
+      const wrappers = await page.$$("div[class*='cardWrapper'], div[class*='CardPc'], div[class*='hashtag-card']");
+
+      for (const el of wrappers.slice(0, 30)) {
+        try {
+          const text = (await el.textContent())?.trim() ?? "";
+          if (text.length < 5) continue;
+
+          const hashIdx = text.indexOf("#");
+          if (hashIdx < 0) continue;
+
+          const postsMatch = text.match(/(\d{1,4}(?:\.\d{1,2})?[KMB])\s*Posts/i);
+          let name: string;
+          let countStr: string | undefined;
+
+          if (postsMatch && postsMatch.index !== undefined) {
+            name = text.slice(hashIdx + 1, postsMatch.index).trim().toLowerCase();
+            countStr = postsMatch[1];
+          } else {
+            const nameMatch = text.slice(hashIdx + 1).match(/^\s*(\w+)/);
+            if (!nameMatch) continue;
+            name = nameMatch[1].toLowerCase();
+          }
+
+          if (!name || name.length < 2 || seen.has(name)) continue;
+          seen.add(name);
+
+          items.push({
+            title: `#${name}`,
+            description: countStr ? `${countStr} posts` : undefined,
+            views: countStr ? parseViewCount(countStr) : undefined,
+            category: "hashtag",
+          });
+        } catch {
+          // ok
+        }
+      }
+    }
+
+    // Last resort: regex scan page HTML for hashtags
     if (items.length === 0) {
       const content = await page.content();
-      const hashtagMatches = content.match(/#\w+/g) ?? [];
+      const hashtagMatches = content.match(/#[a-zA-Z]\w{2,}/g) ?? [];
       const unique = [...new Set(hashtagMatches)].slice(0, 20);
       for (const tag of unique) {
-        if (tag.length > 2) {
+        const name = tag.slice(1).toLowerCase();
+        if (!seen.has(name)) {
+          seen.add(name);
           items.push({ title: tag, category: "hashtag" });
         }
       }

@@ -496,12 +496,14 @@ def call_openai(source_name, safe_name, item_count, source_file):
         source_data = json.dumps(json.load(f))
 
     prompt = f'''Today is $TODAY. Run type: $TYPE. User niche: {niche}.
-You are analyzing {source_name} ({item_count} items) for a user interested in \"{niche}\".
+You are analyzing {source_name} ({item_count} items) for a trend dashboard.
 
-Prioritize items most relevant to the \"{niche}\" niche. For each relevant item:
+IMPORTANT: Include ALL items from the data — do NOT filter out items that are unrelated to \"{niche}\".
+For EVERY item, provide:
 - Momentum: rising|falling|stable|new|viral
 - Why it's trending (1-2 sentences)
-- Score 0-100 based on engagement + relevance to \"{niche}\"
+- Score 0-100 based on overall engagement and virality (NOT niche relevance)
+- Relevance to \"{niche}\": high|medium|low
 
 Data:
 {source_data}
