@@ -153,8 +153,12 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
     );
 
     await page.waitForTimeout(4000 + Math.random() * 3000);
-    await page.mouse.wheel(0, 500);
-    await page.waitForTimeout(1500);
+
+    // Scroll down progressively to load all cards (page lazy-loads)
+    for (let i = 0; i < 3; i++) {
+      await page.mouse.wheel(0, 600);
+      await page.waitForTimeout(1000 + Math.random() * 500);
+    }
 
     // Current layout uses card-based <a> elements with CardPc_container class
     // Each card's textContent looks like: "1# aidetector7KPostsNo related creatorSee analytics"
@@ -176,8 +180,10 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
         let countStr: string | undefined;
 
         if (postsMatch && postsMatch.index !== undefined) {
-          // Name is between # and the count
-          name = text.slice(hashIdx + 1, postsMatch.index).trim().toLowerCase();
+          // Name is between # and the count — extract just the hashtag (word chars only)
+          const rawName = text.slice(hashIdx + 1, postsMatch.index).trim();
+          const wordMatch = rawName.match(/^(\w+)/);
+          name = (wordMatch ? wordMatch[1] : rawName).toLowerCase();
           countStr = postsMatch[1];
         } else {
           // No count found — just extract the hashtag name (letters/digits until junk)
@@ -221,7 +227,9 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
           let countStr: string | undefined;
 
           if (postsMatch && postsMatch.index !== undefined) {
-            name = text.slice(hashIdx + 1, postsMatch.index).trim().toLowerCase();
+            const rawName = text.slice(hashIdx + 1, postsMatch.index).trim();
+            const wordMatch = rawName.match(/^(\w+)/);
+            name = (wordMatch ? wordMatch[1] : rawName).toLowerCase();
             countStr = postsMatch[1];
           } else {
             const nameMatch = text.slice(hashIdx + 1).match(/^\s*(\w+)/);
