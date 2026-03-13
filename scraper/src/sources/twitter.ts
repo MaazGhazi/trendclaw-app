@@ -38,8 +38,10 @@ export async function collect(_runType: RunType): Promise<SourceResult> {
     : "https://trends24.in/";
 
   try {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 45_000 });
-    await page.waitForTimeout(3000 + Math.random() * 2000);
+    // Use domcontentloaded instead of networkidle — trends24.in has many ads/trackers
+    // that keep the network busy indefinitely, causing networkidle to timeout
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.waitForTimeout(4000 + Math.random() * 2000);
 
     // trends24.in: multiple .trend-card divs ordered newest-first.
     // Each card has an <ol> with ranked <li><a> trend links.
