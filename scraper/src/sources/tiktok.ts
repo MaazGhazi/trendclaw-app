@@ -141,119 +141,102 @@ async function fetchEndpoint(config: EndpointConfig): Promise<ScrapedItem[]> {
 // ---------------------------------------------------------------------------
 
 async function collectViaPlaywright(): Promise<ScrapedItem[]> {
-  const items: ScrapedItem[] = [];
+  const allItems: ScrapedItem[] = [];
   const seen = new Set<string>();
   let page: Awaited<ReturnType<typeof newPage>> | null = null;
 
+  // Scrape multiple tabs: hashtags, songs, creators, videos
+  const tabs = [
+    { slug: "hashtag", category: "hashtag" as const },
+    { slug: "music", category: "song" as const },
+    { slug: "creator", category: "creator" as const },
+    { slug: "video", category: "video" as const },
+  ];
+
   try {
     page = await newPage();
-    await page.goto(
-      "https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en",
-      { waitUntil: "networkidle", timeout: 45000 }
-    );
 
-    await page.waitForTimeout(4000 + Math.random() * 3000);
-
-    // Scroll down progressively to load all cards (page lazy-loads)
-    for (let i = 0; i < 3; i++) {
-      await page.mouse.wheel(0, 600);
-      await page.waitForTimeout(1000 + Math.random() * 500);
-    }
-
-    // Current layout uses card-based <a> elements with CardPc_container class
-    // Each card's textContent looks like: "1# aidetector7KPostsNo related creatorSee analytics"
-    const cards = await page.$$("a[class*='CardPc_container']");
-
-    for (const card of cards.slice(0, 30)) {
+    for (const tab of tabs) {
       try {
-        const text = (await card.textContent())?.trim() ?? "";
-        if (text.length < 5) continue;
+        await page.goto(
+          `https://ads.tiktok.com/business/creativecenter/inspiration/popular/${tab.slug}/pc/en`,
+          { waitUntil: "networkidle", timeout: 30000 }
+        );
 
-        // Extract hashtag name: find # then take text until the post count
-        const hashIdx = text.indexOf("#");
-        if (hashIdx < 0) continue;
+        await page.waitForTimeout(3000 + Math.random() * 2000);
 
-        // Find post count: "7KPosts", "20KPosts", "1.5MPosts" etc.
-        // Use limited digit match to avoid capturing digits in hashtag names
-        const postsMatch = text.match(/(\d{1,4}(?:\.\d{1,2})?[KMB])\s*Posts/i);
-        let name: string;
-        let countStr: string | undefined;
-
-        if (postsMatch && postsMatch.index !== undefined) {
-          // Name is between # and the count — extract just the hashtag (word chars only)
-          const rawName = text.slice(hashIdx + 1, postsMatch.index).trim();
-          const wordMatch = rawName.match(/^(\w+)/);
-          name = (wordMatch ? wordMatch[1] : rawName).toLowerCase();
-          countStr = postsMatch[1];
-        } else {
-          // No count found — just extract the hashtag name (letters/digits until junk)
-          const nameMatch = text.slice(hashIdx + 1).match(/^\s*(\w+)/);
-          if (!nameMatch) continue;
-          name = nameMatch[1].toLowerCase();
+        // Dismiss cookie banner if present
+        const gotIt = await page.$("button:has-text('Got it')");
+        if (gotIt) {
+          await gotIt.click();
+          await page.waitForTimeout(500);
         }
 
-        if (!name || name.length < 2 || seen.has(name)) continue;
-        seen.add(name);
+        // Scroll to load cards
+        for (let i = 0; i < 3; i++) {
+          await page.mouse.wheel(0, 600);
+          await page.waitForTimeout(800);
+        }
 
-        // Try to get the card URL for linking
-        const href = await card.getAttribute("href");
-
-        items.push({
-          title: `#${name}`,
-          url: href ? (href.startsWith("http") ? href : `https://ads.tiktok.com${href}`) : undefined,
-          description: countStr ? `${countStr} posts` : undefined,
-          views: countStr ? parseViewCount(countStr) : undefined,
-          category: "hashtag",
-        });
-      } catch {
-        // ok
-      }
-    }
-
-    // Fallback: try broader card wrapper selectors
-    if (items.length === 0) {
-      const wrappers = await page.$$("div[class*='cardWrapper'], div[class*='CardPc'], div[class*='hashtag-card']");
-
-      for (const el of wrappers.slice(0, 30)) {
-        try {
-          const text = (await el.textContent())?.trim() ?? "";
-          if (text.length < 5) continue;
-
-          const hashIdx = text.indexOf("#");
-          if (hashIdx < 0) continue;
-
-          const postsMatch = text.match(/(\d{1,4}(?:\.\d{1,2})?[KMB])\s*Posts/i);
-          let name: string;
-          let countStr: string | undefined;
-
-          if (postsMatch && postsMatch.index !== undefined) {
-            const rawName = text.slice(hashIdx + 1, postsMatch.index).trim();
-            const wordMatch = rawName.match(/^(\w+)/);
-            name = (wordMatch ? wordMatch[1] : rawName).toLowerCase();
-            countStr = postsMatch[1];
-          } else {
-            const nameMatch = text.slice(hashIdx + 1).match(/^\s*(\w+)/);
-            if (!nameMatch) continue;
-            name = nameMatch[1].toLowerCase();
-          }
-
-          if (!name || name.length < 2 || seen.has(name)) continue;
-          seen.add(name);
-
-          items.push({
-            title: `#${name}`,
-            description: countStr ? `${countStr} posts` : undefined,
-            views: countStr ? parseViewCount(countStr) : undefined,
-            category: "hashtag",
+        // Use evaluate to get innerText (preserves line breaks) from each card
+        const cardData = await page.evaluate(() => {
+          const cards = document.querySelectorAll("a[class*='CardPc_container'], div[class*='cardWrapper']");
+          return [...cards].slice(0, 20).map((card) => {
+            const el = card as HTMLElement;
+            return {
+              text: el.innerText,
+              href: el.tagName === "A" ? (el as HTMLAnchorElement).href : null,
+            };
           });
-        } catch {
-          // ok
+        });
+
+        for (const card of cardData) {
+          const lines = card.text
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0);
+          if (lines.length < 2) continue;
+
+          // Parse lines — format varies by tab:
+          // Hashtags: ["1", "# bamadebayo", "Sports & Outdoor", "630", "Posts", ...]
+          // Songs: ["1", "song name", "artist", "duration", ...]
+          // Creators: ["1", "@username", "follower count", ...]
+          // Videos: ["1", "video title", "views", ...]
+          const hashLine = lines.find((l) => l.startsWith("#"));
+          const titleLine = hashLine ?? lines.find((_, i) => i > 0 && i < 3) ?? lines[0];
+          const title = hashLine
+            ? hashLine.replace(/^#\s*/, "#")
+            : titleLine;
+
+          if (!title || title.length < 2) continue;
+          const key = title.toLowerCase().replace(/^#/, "");
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          // Find post/view count
+          const postsIdx = lines.indexOf("Posts");
+          const countLine = postsIdx > 0 ? lines[postsIdx - 1] : undefined;
+          const viewLine = lines.find((l) =>
+            /^\d[\d,.]*[KMB]?$/i.test(l) && !lines.indexOf(l).toString()
+          );
+
+          const count = countLine ?? viewLine;
+
+          allItems.push({
+            title,
+            url: card.href || undefined,
+            description: count ? `${count} ${tab.category === "hashtag" ? "posts" : "views"}` : undefined,
+            views: count ? parseViewCount(count) : undefined,
+            category: tab.category,
+          });
         }
+      } catch {
+        // Tab failed, continue to next
       }
     }
 
-    // Last resort: regex scan page HTML for hashtags
-    if (items.length === 0) {
+    // Last resort if nothing found: regex scan page HTML for hashtags
+    if (allItems.length === 0 && page) {
       const content = await page.content();
       const hashtagMatches = content.match(/#[a-zA-Z]\w{2,}/g) ?? [];
       const unique = [...new Set(hashtagMatches)].slice(0, 20);
@@ -261,7 +244,7 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
         const name = tag.slice(1).toLowerCase();
         if (!seen.has(name)) {
           seen.add(name);
-          items.push({ title: tag, category: "hashtag" });
+          allItems.push({ title: tag, category: "hashtag" });
         }
       }
     }
@@ -269,7 +252,7 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
     await safeClosePage(page);
   }
 
-  return items;
+  return allItems;
 }
 
 // ---------------------------------------------------------------------------
