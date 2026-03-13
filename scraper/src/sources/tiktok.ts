@@ -203,7 +203,8 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
           // Creators: ["1", "@username", "follower count", ...]
           // Videos: ["1", "video title", "views", ...]
           const hashLine = lines.find((l) => l.startsWith("#"));
-          const titleLine = hashLine ?? lines.find((_, i) => i > 0 && i < 3) ?? lines[0];
+          // For non-hashtag tabs, skip rank number (line 0) and take first text line
+          const titleLine = hashLine ?? lines.find((l, i) => i > 0 && !/^\d+$/.test(l)) ?? lines[0];
           const title = hashLine
             ? hashLine.replace(/^#\s*/, "#")
             : titleLine;
@@ -211,6 +212,8 @@ async function collectViaPlaywright(): Promise<ScrapedItem[]> {
           if (!title || title.length < 2) continue;
           const key = title.toLowerCase().replace(/^#/, "");
           if (seen.has(key)) continue;
+          // Filter out UI junk text
+          if (UI_JUNK.some((j) => key.includes(j))) continue;
           seen.add(key);
 
           // Find post/view count
@@ -327,9 +330,17 @@ function formatCount(n: number): string {
 function parseViewCount(text?: string): number | undefined {
   if (!text) return undefined;
   const match = text.match(/([\d.]+)\s*([KMB])/i);
-  if (!match) return undefined;
-  const num = parseFloat(match[1]);
-  const suffix = match[2].toUpperCase();
-  const multiplier = suffix === "K" ? 1_000 : suffix === "M" ? 1_000_000 : 1_000_000_000;
-  return Math.round(num * multiplier);
+  if (match) {
+    const num = parseFloat(match[1]);
+    const suffix = match[2].toUpperCase();
+    const multiplier = suffix === "K" ? 1_000 : suffix === "M" ? 1_000_000 : 1_000_000_000;
+    return Math.round(num * multiplier);
+  }
+  // Handle raw numbers without suffix (e.g., "630", "1200")
+  const rawMatch = text.match(/^([\d,]+)$/);
+  if (rawMatch) return parseInt(rawMatch[1].replace(/,/g, ""), 10) || undefined;
+  return undefined;
 }
+
+// Known UI text that should be filtered out as fake "titles"
+const UI_JUNK = ["connect via tiktok one", "see analytics", "no related creator", "view more", "log in", "sign up"];
