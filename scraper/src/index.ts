@@ -20,6 +20,7 @@ import * as rss from "./sources/rss.js";
 import * as githubTrending from "./sources/github-trending.js";
 import * as googleTrends from "./sources/google-trends.js";
 import * as tiktok from "./sources/tiktok.js";
+import * as twitter from "./sources/twitter.js";
 import { closeBrowser } from "./sources/browser.js";
 
 // ─── Source registry by phase ────────────────────────────────────
@@ -46,6 +47,7 @@ const SOURCES: SourceDef[] = [
   { name: "newsapi",         collect: newsapi.collect,          runTypes: ["digest", "deep_dive"],          phase: "region" },
   { name: "google-trends",   collect: googleTrends.collect,     runTypes: ["digest", "deep_dive"],          phase: "region", browser: true },
   { name: "tiktok",          collect: tiktok.collect,           runTypes: ["digest", "deep_dive"],          phase: "region", browser: true },
+  { name: "twitter",         collect: twitter.collect,          runTypes: ["digest", "deep_dive"],          phase: "region", browser: true },
 
   // ── Topic (per-user keywords/niche) ──
   { name: "youtube-search",  collect: youtube.collectByKeywords,  runTypes: ["pulse", "digest", "deep_dive"], phase: "topic" },
