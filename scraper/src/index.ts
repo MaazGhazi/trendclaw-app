@@ -16,6 +16,9 @@ import * as devto from "./sources/devto.js";
 // RSS sources (reliable, no bot issues)
 import * as rss from "./sources/rss.js";
 
+// Social media trend blogs (RSS + HTML scraping)
+import * as socialTrends from "./sources/social-trends/index.js";
+
 // Browser sources (Playwright stealth — may be blocked)
 import * as githubTrending from "./sources/github-trending.js";
 import * as googleTrends from "./sources/google-trends.js";
@@ -56,6 +59,8 @@ const SOURCES: SourceDef[] = [
   { name: "devto-kw",        collect: devto.collectByKeywords,    runTypes: ["digest", "deep_dive"],          phase: "topic" },
   // Bluesky global trending is also useful
   { name: "bluesky",         collect: bluesky.collect,            runTypes: ["digest", "deep_dive"],          phase: "global" },
+  // Social media trend blogs (HTML scraping)
+  { name: "social-trend-blogs", collect: socialTrends.collect,    runTypes: ["deep_dive"],                    phase: "global" },
 ];
 
 // ─── Runner ──────────────────────────────────────────────────────
@@ -184,6 +189,14 @@ async function main() {
       const rssResults = await rss.collectGlobal(runType);
       for (const r of rssResults) {
         const icon = r.status === "ok" ? "✅" : "❌";
+        console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
+        allResults.push(r);
+      }
+
+      console.log("\n📱 Social trend RSS feeds...");
+      const socialRssResults = await socialTrends.collectRss(runType);
+      for (const r of socialRssResults) {
+        const icon = r.status === "ok" ? "✅" : r.status === "skipped" ? "⏭️" : "❌";
         console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
         allResults.push(r);
       }

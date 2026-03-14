@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { useTrends, useProgress, useHistory, useQueue, useRunTrigger } from "@/lib/hooks";
+import { useTrends, useProgress, useHistory, useQueue, useRunTrigger, useFormats } from "@/lib/hooks";
 import DashboardHeader from "@/components/DashboardHeader";
 import SystemHealthStrip from "@/components/SystemHealthStrip";
 import TabBar, { type TabId } from "@/components/TabBar";
@@ -62,6 +62,7 @@ export default function Home() {
   const { data: progress, error: progressError, elapsed } = useProgress();
   const { runs, loading: historyLoading, refetch: refetchHistory } = useHistory();
   const { data: queueData, refetch: refetchQueue } = useQueue();
+  const { data: formatsData, loading: formatsLoading, error: formatsError } = useFormats();
 
   const onRunStarted = useCallback(() => {
     refetchHistory();
@@ -120,6 +121,8 @@ export default function Home() {
           error={trends.error}
           viewingFile={viewFile}
           onBackToLatest={backToLatest}
+          formatsData={formatsData}
+          formatsLoading={formatsLoading}
         />
       )}
 

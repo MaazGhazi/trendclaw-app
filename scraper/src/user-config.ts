@@ -1,11 +1,25 @@
 import { readFileSync } from "fs";
 
+export interface ReferenceAccount {
+  platform: string;
+  handle: string;
+}
+
+export interface OwnHandle {
+  platform: string;
+  handle: string;
+}
+
 export interface UserConfig {
   region: string;
   niche: string;
   platforms: string[];
   role: string;
   keywords: string[];
+  profile_type: string;
+  content_formats: string[];
+  reference_accounts: ReferenceAccount[];
+  own_handles: OwnHandle[];
 }
 
 const DEFAULT_CONFIG: UserConfig = {
@@ -14,9 +28,27 @@ const DEFAULT_CONFIG: UserConfig = {
   platforms: [],
   role: "creator",
   keywords: [],
+  profile_type: "creator",
+  content_formats: [],
+  reference_accounts: [],
+  own_handles: [],
 };
 
 let cached: UserConfig | null = null;
+
+function parseConfig(p: Record<string, unknown>): UserConfig {
+  return {
+    region: (p.region as string) || "US",
+    niche: (p.niche as string) || "tech",
+    platforms: (p.platforms as string[]) || [],
+    role: (p.role as string) || "creator",
+    keywords: (p.keywords as string[]) || [],
+    profile_type: (p.profile_type as string) || "creator",
+    content_formats: (p.content_formats as string[]) || [],
+    reference_accounts: (p.reference_accounts as ReferenceAccount[]) || [],
+    own_handles: (p.own_handles as OwnHandle[]) || [],
+  };
+}
 
 /**
  * Initialize user config from Supabase profile if credentials are available,
@@ -31,10 +63,11 @@ export async function initUserConfig(): Promise<void> {
   if (supabaseUrl && supabaseKey) {
     try {
       const userId = process.env.SUPABASE_USER_ID;
+      const selectFields = "region,niche,platforms,role,keywords,profile_type,content_formats,reference_accounts,own_handles";
       // Build query — if a specific user ID is set, use it; otherwise grab the first completed profile
-      let url = `${supabaseUrl}/rest/v1/profiles?onboarding_complete=eq.true&select=region,niche,platforms,role,keywords&limit=1`;
+      let url = `${supabaseUrl}/rest/v1/profiles?onboarding_complete=eq.true&select=${selectFields}&limit=1`;
       if (userId) {
-        url = `${supabaseUrl}/rest/v1/profiles?user_id=eq.${userId}&select=region,niche,platforms,role,keywords&limit=1`;
+        url = `${supabaseUrl}/rest/v1/profiles?user_id=eq.${userId}&select=${selectFields}&limit=1`;
       }
 
       const res = await fetch(url, {
@@ -49,14 +82,7 @@ export async function initUserConfig(): Promise<void> {
       if (res.ok) {
         const rows = await res.json();
         if (Array.isArray(rows) && rows.length > 0) {
-          const p = rows[0];
-          cached = {
-            region: p.region || "US",
-            niche: p.niche || "tech",
-            platforms: p.platforms || [],
-            role: p.role || "creator",
-            keywords: p.keywords || [],
-          };
+          cached = parseConfig(rows[0]);
           console.log(`[user-config] Loaded profile from Supabase (region: ${cached.region})`);
           return;
         }
@@ -73,13 +99,7 @@ export async function initUserConfig(): Promise<void> {
     try {
       const raw = readFileSync(configPath, "utf-8");
       const parsed = JSON.parse(raw);
-      cached = {
-        region: parsed.region || "US",
-        niche: parsed.niche || "tech",
-        platforms: parsed.platforms || [],
-        role: parsed.role || "creator",
-        keywords: parsed.keywords || [],
-      };
+      cached = parseConfig(parsed);
       console.log(`[user-config] Loaded from file ${configPath} (region: ${cached.region})`);
       return;
     } catch {
@@ -100,13 +120,7 @@ export function getUserConfig(): UserConfig {
     try {
       const raw = readFileSync(configPath, "utf-8");
       const parsed = JSON.parse(raw);
-      cached = {
-        region: parsed.region || "US",
-        niche: parsed.niche || "tech",
-        platforms: parsed.platforms || [],
-        role: parsed.role || "creator",
-        keywords: parsed.keywords || [],
-      };
+      cached = parseConfig(parsed);
       return cached;
     } catch {
       // fall through

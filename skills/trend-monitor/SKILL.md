@@ -33,6 +33,17 @@ This JSON file contains structured data from these sources:
 - CoinDesk
 - Product Hunt
 
+**Social Media Trend Blogs** (RSS, reliable):
+- Later Blog, Social Media Examiner, Hootsuite Blog, Buffer Blog, Tubefilter, Trend Hunter Social — daily/weekly social media trend analysis
+- ICYMI (Lia Haberman), Future Social (Jack Appleby), Geekout (Matt Navarra), Lindsey Gamble, The Publish Press (Colin & Samir) — weekly creator economy & growth coach newsletters
+
+**Social Trend Blog Pages** (HTML scraped, deep_dive only):
+- Later.com TikTok/Reels trends — trending formats, sounds, hashtags
+- New Engen TikTok trends — weekly trend analysis with longevity predictions
+- SocialBee TikTok trends — viral audio, niche trends
+- HeyOrca trending audio — weekly trending sounds for Reels & TikTok
+- Ramdam TikTok trends — format breakdowns with how-to guides
+
 **Browser Scraped** (may have gaps):
 - GitHub Trending — repos with star counts
 - Google Trends — trending searches (may fail due to bot detection)
@@ -48,6 +59,7 @@ After reading the data:
 2. **Score popularity**: Use the raw metrics (HN score, Reddit upvotes, YouTube views, Wikipedia pageviews, CoinGecko volume) to assign a 0-100 popularity score.
 3. **Explain why**: For every trend, explain what triggered it. Use the descriptions, article titles, and context clues from the data.
 4. **Classify momentum**: Is this rising, peaking, stable, declining, or new?
+5. **Social media format intelligence**: Sources like Later, Hootsuite, SocialBee, HeyOrca, and creator newsletters describe specific content formats (e.g., "POV lip-sync", "transition reveal", "trending audio"). When these sources are present, extract: format type, estimated adoption rate (how widespread), and creator performance lift vs baseline when available from the article text.
 
 ## Step 3: Fill Gaps with Web Search
 

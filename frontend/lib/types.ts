@@ -122,6 +122,31 @@ export interface HistoryRun {
   };
 }
 
+// --- Formats (social trend blog items from Supabase) ---
+
+export interface FormatItem {
+  title: string;
+  url: string | null;
+  description: string | null;
+  platform: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  isNew: boolean;
+}
+
+export interface FormatSource {
+  name: string;
+  platforms: string[];
+  itemCount: number;
+  items: FormatItem[];
+}
+
+export interface FormatsData {
+  sources: FormatSource[];
+  totalItems: number;
+  updatedAt: string;
+}
+
 // --- Constants ---
 
 export const TYPE_LABELS: Record<string, string> = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { TrendData, ProgressData, HistoryRun, QueueData } from "./types";
+import type { TrendData, ProgressData, HistoryRun, QueueData, FormatsData } from "./types";
 import { TYPE_LABELS } from "./types";
 
 // --- useTrends: polls /api/trends or fetches a specific historical file ---
@@ -218,6 +218,34 @@ export function totalDuration(steps: ProgressData["steps"]): string {
   let total = 0;
   if (steps.scraping?.duration_s) total += steps.scraping.duration_s;
   return total > 0 ? `${total.toFixed(1)}s` : "";
+}
+
+// --- useFormats: fetches social trend format data from Supabase ---
+
+export function useFormats() {
+  const [data, setData] = useState<FormatsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchFormats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/formats");
+      if (!res.ok) throw new Error(`${res.status}`);
+      const json = await res.json();
+      setData(json);
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFormats();
+  }, [fetchFormats]);
+
+  return { data, loading, error, refetch: fetchFormats };
 }
 
 export function formatAge(iso: string): string {

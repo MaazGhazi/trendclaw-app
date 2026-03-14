@@ -1,0 +1,570 @@
+{
+  "runType": "pulse",
+  "phase": "global",
+  "collectedAt": "2026-03-13T22:57:38.295Z",
+  "sources": [
+    {
+      "source": "Hacker News",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Show HN: Channel Surfer – Watch YouTube like it’s cable TV",
+          "url": "https://channelsurfer.tv",
+          "score": 361,
+          "comments": 129,
+          "publishedAt": "2026-03-11T14:34:57.000Z"
+        },
+        {
+          "title": "Can I run AI locally?",
+          "url": "https://www.canirun.ai/",
+          "score": 762,
+          "comments": 214,
+          "publishedAt": "2026-03-13T12:46:10.000Z"
+        },
+        {
+          "title": "Mouser: An open source alternative to Logi-Plus mouse software",
+          "url": "https://github.com/TomBadash/MouseControl",
+          "score": 114,
+          "comments": 45,
+          "publishedAt": "2026-03-13T18:42:54.000Z"
+        },
+        {
+          "title": "I Found 39 Algolia Admin Keys Exposed Across Open Source Documentation Sites",
+          "url": "https://benzimmermann.dev/blog/algolia-docsearch-admin-keys",
+          "score": 7,
+          "comments": 1,
+          "publishedAt": "2026-03-13T22:52:05.000Z"
+        },
+        {
+          "title": "Hammerspoon",
+          "url": "https://github.com/Hammerspoon/hammerspoon",
+          "score": 161,
+          "comments": 63,
+          "publishedAt": "2026-03-13T18:34:12.000Z"
+        },
+        {
+          "title": "Qatar helium shutdown puts chip supply chain on a two-week clock",
+          "url": "https://www.tomshardware.com/tech-industry/qatar-helium-shutdown-puts-chip-supply-chain-on-a-two-week-clock",
+          "score": 329,
+          "comments": 314,
+          "publishedAt": "2026-03-13T12:31:09.000Z"
+        },
+        {
+          "title": "Parallels confirms MacBook Neo can run Windows in a virtual machine",
+          "url": "https://www.macrumors.com/2026/03/13/macbook-neo-runs-windows-11-vm/",
+          "score": 149,
+          "comments": 188,
+          "publishedAt": "2026-03-13T14:11:36.000Z"
+        },
+        {
+          "title": "Stanford researchers report first recording of a blue whale's heart rate (2019)",
+          "url": "https://news.stanford.edu/stories/2019/11/first-ever-recording-blue-whales-heart-rate",
+          "score": 33,
+          "comments": 20,
+          "publishedAt": "2026-03-13T19:15:06.000Z"
+        },
+        {
+          "title": "New 'negative light' technology hides data transfers in plain sight",
+          "url": "https://www.unsw.edu.au/newsroom/news/2026/03/New-negative-light-technology-hides-data-transfers-in-plain-sight",
+          "score": 39,
+          "comments": 17,
+          "publishedAt": "2026-03-11T20:46:24.000Z"
+        },
+        {
+          "title": "Elon Musk pushes out more xAI founders as AI coding effort falters",
+          "url": "https://www.ft.com/content/e5fbc6c2-d5a6-4b97-a105-6a96ea849de5",
+          "score": 223,
+          "comments": 284,
+          "publishedAt": "2026-03-13T16:40:42.000Z"
+        }
+      ],
+      "scrapedAt": "2026-03-13T22:57:32.943Z"
+    },
+    {
+      "source": "CoinGecko",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Bitcoin (BTC)",
+          "url": "https://www.coingecko.com/en/coins/bitcoin",
+          "description": "Market cap rank #1",
+          "rank": 1,
+          "score": 0,
+          "priceChange": "1.0%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Neiro (NEIRO)",
+          "url": "https://www.coingecko.com/en/coins/neiro-3",
+          "description": "Market cap rank #653",
+          "rank": 653,
+          "score": 1,
+          "priceChange": "-3.4%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Pudgy Penguins (PENGU)",
+          "url": "https://www.coingecko.com/en/coins/pudgy-penguins",
+          "description": "Market cap rank #104",
+          "rank": 104,
+          "score": 2,
+          "priceChange": "0.6%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Pi Network (PI)",
+          "url": "https://www.coingecko.com/en/coins/pi-network",
+          "description": "Market cap rank #43",
+          "rank": 43,
+          "score": 3,
+          "priceChange": "-17.5%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Hyperliquid (HYPE)",
+          "url": "https://www.coingecko.com/en/coins/hyperliquid",
+          "description": "Market cap rank #15",
+          "rank": 15,
+          "score": 4,
+          "priceChange": "-2.8%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Venice Token (VVV)",
+          "url": "https://www.coingecko.com/en/coins/venice-token",
+          "description": "Market cap rank #137",
+          "rank": 137,
+          "score": 5,
+          "priceChange": "6.8%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Bittensor (TAO)",
+          "url": "https://www.coingecko.com/en/coins/bittensor",
+          "description": "Market cap rank #42",
+          "rank": 42,
+          "score": 6,
+          "priceChange": "7.5%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Aave (AAVE)",
+          "url": "https://www.coingecko.com/en/coins/aave",
+          "description": "Market cap rank #51",
+          "rank": 51,
+          "score": 7,
+          "priceChange": "0.2%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Solana (SOL)",
+          "url": "https://www.coingecko.com/en/coins/solana",
+          "description": "Market cap rank #7",
+          "rank": 7,
+          "score": 8,
+          "priceChange": "1.9%",
+          "volume": "$undefined",
+          "category": "trending"
+        },
+        {
+          "title": "Render (RENDER)",
+          "url": "https://www.coingecko.com/en/coins/render-token",
+          "description": "Market cap rank #70",
+          "rank": 70,
+          "score": 9,
+          "priceChange": "6.8%",
+          "volume": "$undefined",
+          "category": "trending"
+        }
+      ],
+      "scrapedAt": "2026-03-13T22:57:32.725Z"
+    },
+    {
+      "source": "Lobsters",
+      "status": "ok",
+      "items": [
+        {
+          "title": "I traced $2 billion in nonprofit grants and 45 states of lobbying records to figure out who's behind the age verification bills",
+          "url": "https://www.reddit.com/r/linux/s/WqwsCnFE8E",
+          "description": "law, privacy",
+          "score": 130,
+          "comments": 18,
+          "publishedAt": "2026-03-13T06:41:55.000-05:00",
+          "extra": {
+            "tags": [
+              "law",
+              "privacy"
+            ]
+          }
+        },
+        {
+          "title": "Windows 11 after two decades of macOS: okay, but also awful",
+          "url": "https://rakhim.exotext.com/windows-11-experience",
+          "description": "windows",
+          "score": 23,
+          "comments": 3,
+          "publishedAt": "2026-03-13T10:15:03.000-05:00",
+          "extra": {
+            "tags": [
+              "windows"
+            ]
+          }
+        },
+        {
+          "title": "This Is Not The Computer For You",
+          "url": "https://samhenri.gold/blog/20260312-this-is-not-the-computer-for-you/",
+          "description": "hardware, mac",
+          "score": 212,
+          "comments": 56,
+          "publishedAt": "2026-03-12T11:43:27.000-05:00",
+          "extra": {
+            "tags": [
+              "hardware",
+              "mac"
+            ]
+          }
+        },
+        {
+          "title": "Computing in freedom with GNU Emacs",
+          "url": "https://protesilaos.com/codelog/2026-03-13-computing-in-freedom-with-gnu-emacs/",
+          "description": "editors, emacs, lisp",
+          "score": 21,
+          "comments": 4,
+          "publishedAt": "2026-03-13T08:34:02.000-05:00",
+          "extra": {
+            "tags": [
+              "editors",
+              "emacs",
+              "lisp"
+            ]
+          }
+        },
+        {
+          "title": "Reinventing Python's AsyncIO",
+          "url": "https://blog.baro.dev/p/reinventing-pythons-asyncio",
+          "description": "python",
+          "score": 9,
+          "comments": 2,
+          "publishedAt": "2026-03-13T10:17:52.000-05:00",
+          "extra": {
+            "tags": [
+              "python"
+            ]
+          }
+        },
+        {
+          "title": "XML is a cheap DSL",
+          "url": "https://unplannedobsolescence.com/blog/xml-cheap-dsl/",
+          "description": "programming",
+          "score": 10,
+          "comments": 2,
+          "publishedAt": "2026-03-13T14:47:37.000-05:00",
+          "extra": {
+            "tags": [
+              "programming"
+            ]
+          }
+        },
+        {
+          "title": "How to use storytelling to fit inline assembly into Rust",
+          "url": "https://www.ralfj.de/blog/2026/03/13/inline-asm.html",
+          "description": "assembly, rust",
+          "score": 21,
+          "comments": 1,
+          "publishedAt": "2026-03-13T09:08:08.000-05:00",
+          "extra": {
+            "tags": [
+              "assembly",
+              "rust"
+            ]
+          }
+        },
+        {
+          "title": "Plan 9's Acme: The Un-Terminal and Text-Based GUIs",
+          "url": "https://www.danielmoch.com/posts/2025/01/acme/",
+          "description": "editors",
+          "score": 32,
+          "comments": 16,
+          "publishedAt": "2026-03-12T22:54:26.000-05:00",
+          "extra": {
+            "tags": [
+              "editors"
+            ]
+          }
+        },
+        {
+          "title": "How do you manage SSH keys?",
+          "url": "https://lobste.rs/s/zcoz8h/how_do_you_manage_ssh_keys",
+          "description": "ask, practices",
+          "score": 70,
+          "comments": 71,
+          "publishedAt": "2026-03-12T14:19:34.000-05:00",
+          "extra": {
+            "tags": [
+              "ask",
+              "practices"
+            ]
+          }
+        },
+        {
+          "title": "How to make your own static site generator",
+          "url": "https://gaultier.github.io/blog/how_to_make_your_own_static_site_generator.html",
+          "description": "programming",
+          "score": 22,
+          "comments": 21,
+          "publishedAt": "2026-03-12T23:54:39.000-05:00",
+          "extra": {
+            "tags": [
+              "programming"
+            ]
+          }
+        }
+      ],
+      "scrapedAt": "2026-03-13T22:57:32.845Z"
+    },
+    {
+      "source": "GitHub Trending",
+      "status": "ok",
+      "items": [
+        {
+          "title": "microsoft/BitNet",
+          "url": "https://github.com/microsoft/BitNet",
+          "description": "Official inference framework for 1-bit LLMs",
+          "language": "Python",
+          "stars": 33892,
+          "extra": {
+            "todayStars": "2,223 stars today"
+          }
+        },
+        {
+          "title": "langflow-ai/openrag",
+          "url": "https://github.com/langflow-ai/openrag",
+          "description": "OpenRAG is a comprehensive, single package Retrieval-Augmented Generation platform built on Langflow, Docling, and Opensearch.",
+          "language": "Python",
+          "stars": 2208,
+          "extra": {
+            "todayStars": "905 stars today"
+          }
+        },
+        {
+          "title": "lightpanda-io/browser",
+          "url": "https://github.com/lightpanda-io/browser",
+          "description": "Lightpanda: the headless browser designed for AI and automation",
+          "language": "Zig",
+          "stars": 15304,
+          "extra": {
+            "todayStars": "1,175 stars today"
+          }
+        },
+        {
+          "title": "obra/superpowers",
+          "url": "https://github.com/obra/superpowers",
+          "description": "An agentic skills framework & software development methodology that works.",
+          "language": "Shell",
+          "stars": 81823,
+          "extra": {
+            "todayStars": "2,096 stars today"
+          }
+        },
+        {
+          "title": "public-apis/public-apis",
+          "url": "https://github.com/public-apis/public-apis",
+          "description": "A collective list of free APIs",
+          "language": "Python",
+          "stars": 409376,
+          "extra": {
+            "todayStars": "895 stars today"
+          }
+        },
+        {
+          "title": "promptfoo/promptfoo",
+          "url": "https://github.com/promptfoo/promptfoo",
+          "description": "Test your prompts, agents, and RAGs. Red teaming/pentesting/vulnerability scanning for AI. Compare performance of GPT, Claude, Gemini, Llama, and more. Simple declarative configs with command line and CI/CD integration.",
+          "language": "TypeScript",
+          "stars": 15206,
+          "extra": {
+            "todayStars": "1,850 stars today"
+          }
+        },
+        {
+          "title": "msitarzewski/agency-agents",
+          "url": "https://github.com/msitarzewski/agency-agents",
+          "description": "A complete AI agency at your fingertips - From frontend wizards to Reddit community ninjas, from whimsy injectors to reality checkers. Each agent is a specialized expert with personality, processes, and proven deliverables.",
+          "language": "Shell",
+          "stars": 39804,
+          "extra": {
+            "todayStars": "5,758 stars today"
+          }
+        },
+        {
+          "title": "dolthub/dolt",
+          "url": "https://github.com/dolthub/dolt",
+          "description": "Dolt – Git for Data",
+          "language": "Go",
+          "stars": 21050,
+          "extra": {
+            "todayStars": "58 stars today"
+          }
+        },
+        {
+          "title": "google/A2UI",
+          "url": "https://github.com/google/A2UI",
+          "description": "",
+          "language": "TypeScript",
+          "stars": 13024,
+          "extra": {
+            "todayStars": "629 stars today"
+          }
+        },
+        {
+          "title": "fishaudio/fish-speech",
+          "url": "https://github.com/fishaudio/fish-speech",
+          "description": "SOTA Open Source TTS",
+          "language": "Python",
+          "stars": 26832,
+          "extra": {
+            "todayStars": "556 stars today"
+          }
+        }
+      ],
+      "scrapedAt": "2026-03-13T22:57:37.769Z"
+    },
+    {
+      "source": "Reddit Popular",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Panicked Pentagon Sends Land Invasion Force to Middle East",
+          "url": {
+            "@_href": "https://old.reddit.com/r/politics/comments/1rsux6s/panicked_pentagon_sends_land_invasion_force_to/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T18:09:08+00:00"
+        },
+        {
+          "title": "Sometime during the last 2 years i’ve been going to this orthopedic practice they started to declare me as a MTF transgender for no reason.",
+          "url": {
+            "@_href": "https://old.reddit.com/r/mildlyinfuriating/comments/1rsnthn/sometime_during_the_last_2_years_ive_been_going/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T13:48:49+00:00"
+        },
+        {
+          "title": "US orders 2,200 Marines on three warships to Middle East",
+          "url": {
+            "@_href": "https://old.reddit.com/r/worldnews/comments/1rswd2w/us_orders_2200_marines_on_three_warships_to/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T19:01:01+00:00"
+        },
+        {
+          "title": "Ontario to introduce bill exempting Premier, cabinet from FOI requests",
+          "url": {
+            "@_href": "https://old.reddit.com/r/ontario/comments/1rsoc2r/ontario_to_introduce_bill_exempting_premier/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T14:09:08+00:00"
+        },
+        {
+          "title": "Former Canadian Olympic gold medallist presents surprising award to Donald Trump | Sports",
+          "url": {
+            "@_href": "https://old.reddit.com/r/onguardforthee/comments/1rsybi7/former_canadian_olympic_gold_medallist_presents/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T20:12:32+00:00"
+        },
+        {
+          "title": "US orders 2,200 Marines on three warships to Middle East",
+          "url": {
+            "@_href": "https://old.reddit.com/r/news/comments/1rsxyx9/us_orders_2200_marines_on_three_warships_to/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T20:00:10+00:00"
+        },
+        {
+          "title": "Favorite actor who's never had any work done",
+          "url": {
+            "@_href": "https://old.reddit.com/r/okbuddycinephile/comments/1rsuc1o/favorite_actor_whos_never_had_any_work_done/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T17:48:31+00:00"
+        },
+        {
+          "title": "Warnings of Iran Invasion Grow as US to Send Up to 5,000 Marines, Sailors to Middle East",
+          "url": {
+            "@_href": "https://old.reddit.com/r/worldnews/comments/1rsx1e3/warnings_of_iran_invasion_grow_as_us_to_send_up/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T19:25:18+00:00"
+        },
+        {
+          "title": "Chronically late “parent” response to picking up our child on time from school.",
+          "url": {
+            "@_href": "https://old.reddit.com/r/mildlyinfuriating/comments/1rsz8qr/chronically_late_parent_response_to_picking_up/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T20:46:49+00:00"
+        },
+        {
+          "title": "Scott Bessent abruptly pulled away by Trump mid-interview and returns with shaken voice",
+          "url": {
+            "@_href": "https://old.reddit.com/r/Fauxmoi/comments/1rsxqps/scott_bessent_abruptly_pulled_away_by_trump/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T19:51:40+00:00"
+        },
+        {
+          "title": "U.S. military says all 6 airmen in refueling aircraft that crashed in Iraq are dead",
+          "url": {
+            "@_href": "https://old.reddit.com/r/news/comments/1rsraox/us_military_says_all_6_airmen_in_refueling/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T16:00:49+00:00"
+        },
+        {
+          "title": "The Ontario government is closing all remaining Supervised Injection Sites on June 13th, 2026",
+          "url": {
+            "@_href": "https://old.reddit.com/r/ontario/comments/1rsxgay/the_ontario_government_is_closing_all_remaining/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T19:40:47+00:00"
+        },
+        {
+          "title": "'We don't need Ukraine's help' — Trump rebuffs Zelensky's drone defense offer",
+          "url": {
+            "@_href": "https://old.reddit.com/r/worldnews/comments/1rss1ik/we_dont_need_ukraines_help_trump_rebuffs/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T16:27:39+00:00"
+        },
+        {
+          "title": "[Davidi, Mae] Team Canada are all wearing Hockey Canada jerseys in warmups. Tyler O’Neill cut the sleeves off his.",
+          "url": {
+            "@_href": "https://old.reddit.com/r/baseball/comments/1rsz8gl/davidi_mae_team_canada_are_all_wearing_hockey/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T20:46:32+00:00"
+        },
+        {
+          "title": "My chocolate chip muffins are now just chocolate-y",
+          "url": {
+            "@_href": "https://old.reddit.com/r/mildlyinteresting/comments/1rsw88n/my_chocolate_chip_muffins_are_now_just_chocolatey/"
+          },
+          "description": "",
+          "publishedAt": "2026-03-13T18:56:21+00:00"
+        }
+      ],
+      "scrapedAt": "2026-03-13T22:57:38.268Z"
+    }
+  ],
+  "totalItems": 55,
+  "failedSources": []
+}
