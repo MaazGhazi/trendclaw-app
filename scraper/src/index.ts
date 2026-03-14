@@ -60,7 +60,7 @@ const SOURCES: SourceDef[] = [
   // Bluesky global trending is also useful
   { name: "bluesky",         collect: bluesky.collect,            runTypes: ["digest", "deep_dive"],          phase: "global" },
   // Social media trend blogs (HTML scraping)
-  { name: "social-trend-blogs", collect: socialTrends.collect,    runTypes: ["deep_dive"],                    phase: "global" },
+  { name: "social-trend-blogs", collect: socialTrends.collect,    runTypes: ["pulse", "digest", "deep_dive"], phase: "global" },
 ];
 
 // ─── Runner ──────────────────────────────────────────────────────

@@ -80,7 +80,7 @@ function getRunning(): RunningJob | null {
 
 // ─── Start a pipeline job ────────────────────────────────────────────────────
 
-function startJob(jobId: string, type: string): number {
+function startJob(jobId: string, type: string, userId?: string): number {
   const scriptPath = path.join(
     process.cwd(),
     "..",
@@ -90,9 +90,12 @@ function startJob(jobId: string, type: string): number {
 
   const startedAt = new Date().toISOString();
 
+  const args = [scriptPath, type];
+  if (userId) args.push(userId);
+
   const child = execFile(
     "bash",
-    [scriptPath, type],
+    args,
     {
       env: { ...process.env, PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin" },
       timeout: 600_000, // 10 min
@@ -125,7 +128,7 @@ function startJob(jobId: string, type: string): number {
         const next = queue.queued.shift()!;
         writeQueue(queue);
         console.log(`[queue] Dispatching next job: ${next.type} (${next.id})`);
-        const nextPid = startJob(next.id, next.type);
+        const nextPid = startJob(next.id, next.type, next.queued_by);
         // Update lock with new job
         fs.writeFileSync(
           LOCK_FILE,
@@ -158,7 +161,7 @@ export async function GET() {
 // ─── POST /api/run — trigger or queue a pipeline ─────────────────────────────
 
 export async function POST(request: NextRequest) {
-  let body: { type?: string; user_id?: string };
+  let body: { type?: string; user_id?: string; config?: Record<string, unknown> };
   try {
     body = await request.json();
   } catch {
@@ -166,6 +169,7 @@ export async function POST(request: NextRequest) {
   }
 
   const type = body.type || "pulse";
+  const userId = body.user_id;
   if (!VALID_TYPES.includes(type)) {
     return NextResponse.json(
       { error: `Invalid type. Must be one of: ${VALID_TYPES.join(", ")}` },
@@ -198,7 +202,7 @@ export async function POST(request: NextRequest) {
       id: jobId,
       type,
       queued_at: new Date().toISOString(),
-      queued_by: body.user_id,
+      queued_by: userId,
     });
     writeQueue(queue);
 
@@ -219,7 +223,7 @@ export async function POST(request: NextRequest) {
 
   // No pipeline running — start immediately
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  const pid = startJob(jobId, type);
+  const pid = startJob(jobId, type, userId);
 
   // Write lock file
   fs.writeFileSync(

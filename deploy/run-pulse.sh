@@ -18,6 +18,7 @@ fi
 set +a
 
 TYPE="${1:-pulse}"
+TARGET_USER_ID="${2:-}"
 SCRAPER_DIR="$PROJECT_DIR/scraper"
 SCRAPER_OUTPUT="${SCRAPER_OUTPUT_DIR:-$SCRAPER_DIR/output}"
 MEMORY_DIR="$HOME/.openclaw/workspace/memory"
@@ -79,7 +80,12 @@ if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_KEY" ]; then
   python3 -c "
 import json, urllib.request
 try:
-    url = '${SUPABASE_URL}/rest/v1/profiles?onboarding_complete=eq.true&select=user_id,region,niche,platforms,role,keywords'
+    target = '${TARGET_USER_ID}'
+    base = '${SUPABASE_URL}/rest/v1/profiles'
+    if target:
+        url = base + '?user_id=eq.' + target + '&select=user_id,region,niche,platforms,role,keywords'
+    else:
+        url = base + '?onboarding_complete=eq.true&select=user_id,region,niche,platforms,role,keywords'
     req = urllib.request.Request(url, headers={
         'apikey': '${SUPABASE_KEY}',
         'Authorization': 'Bearer ${SUPABASE_KEY}',
@@ -90,7 +96,8 @@ try:
         rows = [{'user_id': 'default', 'region': 'US', 'niche': 'tech', 'platforms': [], 'role': 'creator', 'keywords': []}]
     with open('$USERS_FILE', 'w') as f:
         json.dump(rows, f)
-    print(f'Found {len(rows)} active users')
+    label = f'user {target}' if target else f'{len(rows)} active users'
+    print(f'Found {label}')
 except Exception as e:
     print(f'Supabase query failed: {e}, using default user')
     with open('$USERS_FILE', 'w') as f:
@@ -484,7 +491,7 @@ from urllib.request import Request, urlopen
 with open('$USER_SOURCES/_manifest.json') as f:
     manifest = json.load(f)
 
-active = [s for s in manifest if s.get('file')]
+active = [s for s in manifest if s.get('file') and s.get('name') != 'Social Trend Blogs']
 api_key = os.environ.get('OPENAI_API_KEY', '')
 niche = '$NICHE'
 
@@ -656,6 +663,9 @@ fallback_used = 0
 
 for entry in manifest:
     name = entry['name']
+    # Blog items are served separately via social_trend_items — skip from trend categories
+    if name == 'Social Trend Blogs':
+        continue
     if entry['status'] != 'ok' or not entry.get('file'):
         if entry['status'] in ('error', 'skipped'):
             sources_failed.append(name)
