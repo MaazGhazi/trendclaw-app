@@ -1,8 +1,763 @@
 {
-  "runType": "pulse",
+  "runType": "deep_dive",
   "phase": "region",
-  "collectedAt": "2026-03-13T22:57:32.229Z",
-  "sources": [],
-  "totalItems": 0,
-  "failedSources": []
+  "collectedAt": "2026-03-14T20:08:11.072Z",
+  "sources": [
+    {
+      "source": "YouTube Trending",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Aadu 3 Video Song | Sulthaan | Shaan Rahman | Midhun Manuel Thomas |Vijay Babu & Venu Kunnappilly",
+          "url": "https://www.youtube.com/watch?v=55KzMQB6b18",
+          "description": "Friday Music Company",
+          "views": 517421,
+          "comments": 2401,
+          "category": "10",
+          "publishedAt": "2026-03-14T14:30:06Z"
+        },
+        {
+          "title": "Ustaad Bhagat Singh Trailer | Pawan Kalyan | Harish Shankar | Sreeleela | Raashii Khanna",
+          "url": "https://www.youtube.com/watch?v=MLU5ZEp9YDo",
+          "description": "Mythri Movie Makers",
+          "views": 2739437,
+          "comments": 9155,
+          "category": "24",
+          "publishedAt": "2026-03-14T13:00:20Z"
+        },
+        {
+          "title": "Countries Decide Who Wins $25,000",
+          "url": "https://www.youtube.com/watch?v=wyKNY1_HnTc",
+          "description": "MrBeast Gaming",
+          "views": 1333866,
+          "comments": 15143,
+          "category": "20",
+          "publishedAt": "2026-03-14T16:00:05Z"
+        },
+        {
+          "title": "Charlotte Cardin - The Way We Touch [Official Music Video]",
+          "url": "https://www.youtube.com/watch?v=BEpkJWQbpLs",
+          "description": "Charlotte Cardin",
+          "views": 136820,
+          "comments": 227,
+          "category": "10",
+          "publishedAt": "2026-03-13T12:00:06Z"
+        },
+        {
+          "title": "STREET FIGHTER Official Teaser Trailer (2026) Guile",
+          "url": "https://www.youtube.com/watch?v=_mh0bgWazEM",
+          "description": "ONE Media",
+          "views": 469628,
+          "comments": 1036,
+          "category": "1",
+          "publishedAt": "2026-03-13T16:31:12Z"
+        },
+        {
+          "title": "Can I Catch Minecraft's Smartest X-Rayer?",
+          "url": "https://www.youtube.com/watch?v=xyvqjjF-xYs",
+          "description": "Yeah Jaron",
+          "views": 194986,
+          "comments": 1762,
+          "category": "20",
+          "publishedAt": "2026-03-14T14:30:51Z"
+        },
+        {
+          "title": "Ranjha",
+          "url": "https://www.youtube.com/watch?v=w7Us7dFl4QE",
+          "description": "Release - Topic",
+          "views": 134248,
+          "comments": 14,
+          "category": "10",
+          "publishedAt": "2026-03-13T04:04:58Z"
+        },
+        {
+          "title": "Something Very Bad Is Going to Happen | Official Trailer | Netflix",
+          "url": "https://www.youtube.com/watch?v=vMc_pWm7G7o",
+          "description": "Netflix",
+          "views": 750231,
+          "comments": 727,
+          "category": "24",
+          "publishedAt": "2026-03-13T15:00:00Z"
+        },
+        {
+          "title": "I Ranked Literally Every Pokemon",
+          "url": "https://www.youtube.com/watch?v=1QwPt9YsnOE",
+          "description": "WolfeyVGC",
+          "views": 203818,
+          "comments": 3140,
+          "category": "20",
+          "publishedAt": "2026-03-14T15:00:08Z"
+        },
+        {
+          "title": "Asla - Watan Sahi [Official MV] Latest Punjabi Song - K Million Music",
+          "url": "https://www.youtube.com/watch?v=sCuLojys0n4",
+          "description": "K Million Music",
+          "views": 1039412,
+          "comments": 2202,
+          "category": "10",
+          "publishedAt": "2026-03-13T10:57:39Z"
+        },
+        {
+          "title": "BTS (방탄소년단) '아리랑 (ARIRANG)' Animation Trailer: What is your love song?",
+          "url": "https://www.youtube.com/watch?v=Exukk6JO9i0",
+          "description": "BANGTANTV",
+          "views": 3154814,
+          "comments": 39103,
+          "category": "10",
+          "publishedAt": "2026-03-13T02:00:00Z"
+        },
+        {
+          "title": "Mikey POOR vs JJ RICH POLICE STATION Build Battle in Minecraft",
+          "url": "https://www.youtube.com/watch?v=6Ct0b3PT3AQ",
+          "description": "Maizen",
+          "views": 274804,
+          "comments": 404,
+          "category": "20",
+          "publishedAt": "2026-03-14T13:09:39Z"
+        },
+        {
+          "title": "Shenseea, Vybz Kartel & Rvssian - Talk To Me Nuh (Official Video)",
+          "url": "https://www.youtube.com/watch?v=R73WxrPM1YU",
+          "description": "Shenseea",
+          "views": 647722,
+          "comments": 2538,
+          "category": "10",
+          "publishedAt": "2026-03-13T04:00:06Z"
+        },
+        {
+          "title": "Malcolm in the Middle: Life's Still Unfair | Official Trailer | Hulu",
+          "url": "https://www.youtube.com/watch?v=ABol0H2n_rc",
+          "description": "Hulu",
+          "views": 5183443,
+          "comments": 4430,
+          "category": "24",
+          "publishedAt": "2026-03-12T16:40:44Z"
+        },
+        {
+          "title": "Spending $8,582,495 To Build The TALLEST WATER SLIDE In Roblox..",
+          "url": "https://www.youtube.com/watch?v=0dBtRFd2skM",
+          "description": "Foltyn",
+          "views": 644478,
+          "comments": 1589,
+          "category": "20",
+          "publishedAt": "2026-03-14T04:31:45Z"
+        },
+        {
+          "title": "Tom MacDonald - \"ANTI\"",
+          "url": "https://www.youtube.com/watch?v=Efc2IVw5lM8",
+          "description": "Tom MacDonald",
+          "views": 793362,
+          "comments": 7211,
+          "category": "10",
+          "publishedAt": "2026-03-13T15:59:11Z"
+        },
+        {
+          "title": "Main Vaapas Aaunga | Official Teaser | Imtiaz Ali, A. R. Rahman, Diljit, Vedang, Sharvari, Naseer",
+          "url": "https://www.youtube.com/watch?v=dvQgE-8noLs",
+          "description": "Applause Entertainment",
+          "views": 2588160,
+          "comments": 696,
+          "category": "24",
+          "publishedAt": "2026-03-13T07:30:09Z"
+        },
+        {
+          "title": "Five Nights At Freddy's 2 In Real Life",
+          "url": "https://www.youtube.com/watch?v=uNzOmLhmU1k",
+          "description": "Shiloh & Bros",
+          "views": 2337616,
+          "comments": 16928,
+          "category": "24",
+          "publishedAt": "2026-03-13T13:58:18Z"
+        },
+        {
+          "title": "Porch Light",
+          "url": "https://www.youtube.com/watch?v=ZhWTiZiTB7Y",
+          "description": "Noah Kahan - Topic",
+          "views": 221530,
+          "comments": 159,
+          "category": "10",
+          "publishedAt": "2026-03-12T10:01:02Z"
+        },
+        {
+          "title": "Bhooth Bangla -Official Teaser | Akshay Kumar, Tabu, Paresh, Wamiqa, Priyadarshan |In Cinemas 10 Apr",
+          "url": "https://www.youtube.com/watch?v=D6sCbIv4N7Y",
+          "description": "Balaji Motion Pictures",
+          "views": 19055749,
+          "comments": 12832,
+          "category": "1",
+          "publishedAt": "2026-03-12T05:41:02Z"
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:06:54.034Z"
+    },
+    {
+      "source": "NewsAPI",
+      "status": "ok",
+      "items": [],
+      "scrapedAt": "2026-03-14T20:06:54.224Z"
+    },
+    {
+      "source": "Google Trends",
+      "status": "ok",
+      "items": [
+        {
+          "title": "avalanche vs jets",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 500
+        },
+        {
+          "title": "arouca vs benfica",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "prix essence montreal",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "perfect order pokemon set",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "premier league table",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "sens",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "march madness",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "pwhl standings",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 100
+        },
+        {
+          "title": "hornets vs spurs",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 200
+        },
+        {
+          "title": "al fateh vs al-hilal",
+          "url": "https://trends.google.com/trending/rss?geo=CA",
+          "views": 100
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:06:55.078Z"
+    },
+    {
+      "source": "tiktok",
+      "status": "error",
+      "error": "Timed out after 60s",
+      "items": [],
+      "scrapedAt": "2026-03-14T20:07:58.723Z"
+    },
+    {
+      "source": "X (Twitter) Trends",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Gudas",
+          "url": "https://x.com/search?q=Gudas&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Max Dowman",
+          "url": "https://x.com/search?q=Max%20Dowman&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "#KingRezaPahlavi‌ForIran",
+          "url": "https://x.com/search?q=%23KingRezaPahlavi%E2%80%8CForIran&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "hashtag"
+        },
+        {
+          "title": "Everton",
+          "url": "https://x.com/search?q=Everton&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "#TFCLive",
+          "url": "https://x.com/search?q=%23TFCLive&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "hashtag"
+        },
+        {
+          "title": "#ARSEVE",
+          "url": "https://x.com/search?q=%23ARSEVE&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "hashtag"
+        },
+        {
+          "title": "Havertz",
+          "url": "https://x.com/search?q=Havertz&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Fofana",
+          "url": "https://x.com/search?q=Fofana&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Arteta",
+          "url": "https://x.com/search?q=Arteta&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Arsenal",
+          "url": "https://x.com/search?q=Arsenal&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Don Cherry",
+          "url": "https://x.com/search?q=Don%20Cherry&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Friday the 13th",
+          "url": "https://x.com/search?q=Friday%20the%2013th&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Matthews",
+          "url": "https://x.com/search?q=Matthews&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Kharg Island",
+          "url": "https://x.com/search?q=Kharg%20Island&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Order of Canada",
+          "url": "https://x.com/search?q=Order%20of%20Canada&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Parros",
+          "url": "https://x.com/search?q=Parros&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Saka",
+          "url": "https://x.com/search?q=Saka&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Buffy",
+          "url": "https://x.com/search?q=Buffy&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Option B",
+          "url": "https://x.com/search?q=Option%20B&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Delap",
+          "url": "https://x.com/search?q=Delap&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Patrick Roy",
+          "url": "https://x.com/search?q=Patrick%20Roy&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Gyokeres",
+          "url": "https://x.com/search?q=Gyokeres&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Thomas Chabot",
+          "url": "https://x.com/search?q=Thomas%20Chabot&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "#PiDay",
+          "url": "https://x.com/search?q=%23PiDay&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "hashtag"
+        },
+        {
+          "title": "#Caturday",
+          "url": "https://x.com/search?q=%23Caturday&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "hashtag"
+        },
+        {
+          "title": "Ford",
+          "url": "https://x.com/search?q=Ford&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Michael Amadio",
+          "url": "https://x.com/search?q=Michael%20Amadio&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Chelsea",
+          "url": "https://x.com/search?q=Chelsea&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Al-Quds",
+          "url": "https://x.com/search?q=Al-Quds&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        },
+        {
+          "title": "Madueke",
+          "url": "https://x.com/search?q=Madueke&src=trend_click",
+          "description": "Trending on X (Twitter)",
+          "category": "topic"
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:08:10.228Z"
+    },
+    {
+      "source": "TechCrunch",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Honda is killing its EVs — and any chance of competing in the future",
+          "url": "https://techcrunch.com/2026/03/14/honda-is-killing-its-evs-and-any-chance-of-competing-in-the-future/",
+          "description": "Honda's decision to kill its three EVs for the U.S. market will reverberate far beyond North America.",
+          "publishedAt": "Sat, 14 Mar 2026 17:23:24 +0000"
+        },
+        {
+          "title": "Meta reportedly considering layoffs that could affect 20% of the company",
+          "url": "https://techcrunch.com/2026/03/14/meta-reportedly-considering-layoffs-that-could-affect-20-of-the-company/",
+          "description": "These layoffs could help Facebook's parent company offset its aggressive spending on AI infrastructure, as well as AI-related acquisitions and hiring.",
+          "publishedAt": "Sat, 14 Mar 2026 16:28:42 +0000"
+        },
+        {
+          "title": "As people look for ways to make new friends, here are the apps promising to help",
+          "url": "https://techcrunch.com/2026/03/14/as-people-look-for-ways-to-make-new-friends-here-are-the-apps-promising-to-help/",
+          "description": "We've compiled a list of friendship apps, from friend discovery platforms like BFF to event-focused ones like Timeleft.",
+          "publishedAt": "Sat, 14 Mar 2026 16:00:00 +0000"
+        },
+        {
+          "title": "How to use the new ChatGPT app integrations, including DoorDash, Spotify, Uber, and others",
+          "url": "https://techcrunch.com/2026/03/14/how-to-use-the-new-chatgpt-app-integrations-including-doordash-spotify-uber-and-others/",
+          "description": "Learn how to use Spotify, Canva, Figma, Expedia, and other apps directly in ChatGPT.",
+          "publishedAt": "Sat, 14 Mar 2026 13:00:00 +0000"
+        },
+        {
+          "title": "&#8216;Not built right the first time&#8217; &#8212; Musk&#8217;s xAI is starting over again, again",
+          "url": "https://techcrunch.com/2026/03/13/not-built-right-the-first-time-musks-xai-is-starting-over-again-again/",
+          "description": "The AI lab is revamping its effort to build an AI coding tool, with two new executives joining from Cursor.",
+          "publishedAt": "Sat, 14 Mar 2026 00:12:22 +0000"
+        },
+        {
+          "title": "Lawyer behind AI psychosis cases warns of mass casualty risks",
+          "url": "https://techcrunch.com/2026/03/13/lawyer-behind-ai-psychosis-cases-warns-of-mass-casualty-risks/",
+          "description": "AI chatbots have been linked to suicides for years. Now one lawyer says they are showing up in mass casualty cases too, and the technology is moving faster than the safeguards.",
+          "publishedAt": "Sat, 14 Mar 2026 00:01:02 +0000"
+        },
+        {
+          "title": "Digg lays off staff and shuts down app as company retools",
+          "url": "https://techcrunch.com/2026/03/13/digg-lays-off-staff-and-shuts-down-app-as-company-retools/",
+          "description": "Digg laid off a significant number of staff and shut down its app, but says it's not giving up on the startup.",
+          "publishedAt": "Fri, 13 Mar 2026 21:51:17 +0000"
+        },
+        {
+          "title": "Nyne, founded by a father-son duo, gives AI agents the human context they’re missing",
+          "url": "https://techcrunch.com/2026/03/13/nyne-founded-by-a-father-son-duo-gives-ai-agents-the-human-context-theyre-missing/",
+          "description": "The data infrastructure startup raised $5.3 million in seed funding led by Wischoff Ventures and South Park Commons.",
+          "publishedAt": "Fri, 13 Mar 2026 21:37:01 +0000"
+        },
+        {
+          "title": "Facebook makes it easier for creators to report impersonators",
+          "url": "https://techcrunch.com/2026/03/13/facebook-makes-it-easier-for-creators-to-report-impersonators/",
+          "description": "Facebook is making it easier for creators to report impersonators while tightening rules around reposts and other unoriginal content.",
+          "publishedAt": "Fri, 13 Mar 2026 20:48:43 +0000"
+        },
+        {
+          "title": "Steven Spielberg says he&#8217;s &#8216;never used AI&#8217; in any of his films",
+          "url": "https://techcrunch.com/2026/03/13/steven-spielberg-says-hes-never-used-ai-in-any-of-his-films/",
+          "description": "At SXSW, Steven Spielberg said AI has uses in many fields, but not when it comes to replacing creative people in film and TV writing.",
+          "publishedAt": "Fri, 13 Mar 2026 19:47:58 +0000"
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:08:10.574Z"
+    },
+    {
+      "source": "The Verge",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Meta is reportedly laying off up to 20 percent of its staff",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/business/895026/meta-laying-off-20-percent"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T14:48:56-04:00"
+        },
+        {
+          "title": "Hulu, Disney Plus, and the Pixel Watch 4 are among this week’s best deals",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/gadgets/894699/hulu-disney-plus-subscription-oscars-google-pixel-watch-4-deal-sale"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T11:46:28-04:00"
+        },
+        {
+          "title": "Prediction markets want the Oscars to be your gateway drug to betting on everything",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/entertainment/894878/oscars-2026-kalshi-sinners-one-battle-after-anothers-marty-supreme-baftas-gambling"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T11:30:00-04:00"
+        },
+        {
+          "title": "MacBook Air M5 review: a small update for the ‘just right’ Mac",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/tech/894866/apple-macbook-air-m5-15-2026-laptop-review"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T11:00:00-04:00"
+        },
+        {
+          "title": "A Scavengers Reign artist explores contemplative sci-fi in new comics",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/entertainment/894514/jonathan-djob-nkondo-artist-interview-kickstarter-scavengers-reign"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T10:00:00-04:00"
+        },
+        {
+          "title": "Asus’ new open earbuds are a wonderful companion for handheld gaming",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/tech/893765/asus-cetra-open-wireless-gaming-earbuds-hands-on-impressions"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T09:00:00-04:00"
+        },
+        {
+          "title": "Samsung Galaxy S26 Ultra review: show off",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/tech/893936/samsung-galaxy-s26-ultra-review-show-off"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T08:00:00-04:00"
+        },
+        {
+          "title": "5 great indie games from GDC 2026",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/games/894511/gdc-2026-best-indie-games"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T08:00:00-04:00"
+        },
+        {
+          "title": "Wordle’s creator made a fun new puzzle game",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/tech/894586/wordle-parseword-sonos-play-installer"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T08:00:00-04:00"
+        },
+        {
+          "title": "European retailers yank popular headphones after study reports trace amounts of hormone-disrupting chemicals",
+          "url": {
+            "@_rel": "alternate",
+            "@_type": "text/html",
+            "@_href": "https://www.theverge.com/science/894771/headphones-hormone-disrupting-chemicals-study"
+          },
+          "description": "",
+          "publishedAt": "2026-03-14T07:00:00-04:00"
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:08:10.712Z"
+    },
+    {
+      "source": "Ars Technica",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Staff complain that xAI is flailing because of constant upheaval",
+          "url": "https://arstechnica.com/ai/2026/03/staff-complain-that-xai-is-flailing-because-of-constant-upheaval/",
+          "description": "Staff complain that the constant upheaval is destroying morale.",
+          "publishedAt": "Sat, 14 Mar 2026 07:14:53 +0000"
+        },
+        {
+          "title": "NASA officials sidestepped questions on Artemis II risks—there's a reason why",
+          "url": "https://arstechnica.com/space/2026/03/flying-to-the-moon-for-the-first-time-in-54-years-is-risky-but-how-risky/",
+          "description": "\"This ought to make for some good reading,\" NASA's mission management team chair said.",
+          "publishedAt": "Sat, 14 Mar 2026 00:17:31 +0000"
+        },
+        {
+          "title": "Woman sneezes out maggots after fly larvae get trapped in her deviated septum",
+          "url": "https://arstechnica.com/health/2026/03/woman-sneezes-out-maggots-after-fly-larvae-get-trapped-in-her-deviated-septum/",
+          "description": "She made a full recovery, despite the maggots.",
+          "publishedAt": "Fri, 13 Mar 2026 22:38:10 +0000"
+        },
+        {
+          "title": "Slay the Spire 2 is a bit too familiar for its own good",
+          "url": "https://arstechnica.com/gaming/2026/03/slay-the-spire-2-is-a-bit-too-familiar-for-its-own-good/",
+          "description": "Early Access impressions: New characters shine, but it feels like we've done this before.",
+          "publishedAt": "Fri, 13 Mar 2026 22:26:06 +0000"
+        },
+        {
+          "title": "Figuring out why AIs get flummoxed by some games",
+          "url": "https://arstechnica.com/ai/2026/03/figuring-out-why-ais-get-flummoxed-by-some-games/",
+          "description": "When winning depends on intuiting a mathematical function, AIs come up short.",
+          "publishedAt": "Fri, 13 Mar 2026 21:47:34 +0000"
+        },
+        {
+          "title": "Google Fiber will be sold to private equity firm and merge with cable company",
+          "url": "https://arstechnica.com/tech-policy/2026/03/google-fiber-will-be-sold-to-private-equity-firm-and-merge-with-cable-company/",
+          "description": "GFiber and Astound to merge with Alphabet selling majority stake to Stonepeak.",
+          "publishedAt": "Fri, 13 Mar 2026 20:57:54 +0000"
+        },
+        {
+          "title": "Supply-chain attack using invisible code hits GitHub and other repositories",
+          "url": "https://arstechnica.com/security/2026/03/supply-chain-attack-using-invisible-code-hits-github-and-other-repositories/",
+          "description": "Unicode that's invisible to the human eye was largely abandoned—until attackers took notice.",
+          "publishedAt": "Fri, 13 Mar 2026 20:18:08 +0000"
+        },
+        {
+          "title": "Adobe settles DOJ cancellation fee lawsuit, will pay $75 million penalty",
+          "url": "https://arstechnica.com/gadgets/2026/03/adobe-settles-doj-cancellation-fee-lawsuit-will-pay-75-million-penalty/",
+          "description": "Adobe says it will also give customers who \"qualify\" free services but is vague on details.",
+          "publishedAt": "Fri, 13 Mar 2026 18:47:08 +0000"
+        },
+        {
+          "title": "Doubling the voltage: What 800 V architecture really changes in EVs",
+          "url": "https://arstechnica.com/cars/2026/03/doubling-the-voltage-what-800-v-architecture-really-changes-in-evs/",
+          "description": "Confused about electric vehicle voltages? You won't be after reading this.",
+          "publishedAt": "Fri, 13 Mar 2026 18:30:17 +0000"
+        },
+        {
+          "title": "Another AT&T FirstNet user gets shocking $6,200 bill, at $2 per megabyte",
+          "url": "https://arstechnica.com/tech-policy/2026/03/att-wrongly-charged-man-6196-reversed-bill-after-hearing-from-ars/",
+          "description": "Bizarre FirstNet charge nearly identical to one that hit different user in 2024.",
+          "publishedAt": "Fri, 13 Mar 2026 17:49:44 +0000"
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:08:10.710Z"
+    },
+    {
+      "source": "CoinDesk",
+      "status": "ok",
+      "items": [
+        {
+          "title": "Hoskinson might be wrong about the future of decentralized compute",
+          "url": "https://www.coindesk.com/opinion/2026/03/14/hoskinson-might-be-wrong-about-the-future-of-decentralized-compute",
+          "description": "Cardano’s founder recently made an argument about hyperscalers that needs to be addressed, says Fan.",
+          "publishedAt": "Sat, 14 Mar 2026 18:30:00 +0000"
+        },
+        {
+          "title": "Crypto’s multi-million F1 sponsorship under fire as Middle East war hits region's biggest events",
+          "url": "https://www.coindesk.com/business/2026/03/14/crypto-s-multi-million-f1-sponsorship-under-fire-as-middle-east-war-hits-region-s-biggest-events",
+          "description": "Other major business events across the UAE, such as Middle East Energy Dubai and the Dubai International Boat Show, have also been postponed or delayed.",
+          "publishedAt": "Sat, 14 Mar 2026 18:00:00 +0000"
+        },
+        {
+          "title": "Ethereum Foundation sells 5,000 ether to Tom Lee's BitMine in $10.2 million deal",
+          "url": "https://www.coindesk.com/business/2026/03/14/ethereum-foundation-sells-5-000-ether-to-tom-lee-s-bitmine-in-usd10-2-million-deal",
+          "description": "The funds will support the EF's core operations, including protocol R&D and ecosystem grants, as part of a treasury strategy to balance ETH and fiat-like assets.",
+          "publishedAt": "Sat, 14 Mar 2026 17:56:34 +0000"
+        },
+        {
+          "title": "Boris Johnson calling Bitcoin a ‘Ponzi’ draws rebuttal from Michael Saylor and others",
+          "url": "https://www.coindesk.com/business/2026/03/14/boris-johnson-calling-bitcoin-a-ponzi-draws-rebuttal-from-michael-saylor-and-others",
+          "description": "The cryptocurrency community pushed back, with Michael Saylor saying Bitcoin has no issuer, promoter, or guaranteed return, and is instead driven by code and market demand.",
+          "publishedAt": "Sat, 14 Mar 2026 17:18:37 +0000"
+        },
+        {
+          "title": "Wall Street pushes tokenized stocks, but institutions aren’t eager to trade them",
+          "url": "https://www.coindesk.com/business/2026/03/14/wall-street-pushes-tokenized-stocks-but-institutions-aren-t-eager-to-trade-them",
+          "description": "Exchanges are racing toward blockchain-based equities and 24/7 trading. Institutions, however, fear liquidity and funding risks.",
+          "publishedAt": "Sat, 14 Mar 2026 16:00:00 +0000"
+        },
+        {
+          "title": "Brazil industry giants representing 850 companies decry stablecoin tax threat",
+          "url": "https://www.coindesk.com/business/2026/03/14/brazil-industry-giants-representing-850-companies-decry-stablecoin-tax-threat",
+          "description": "They argue the tax would be illegal, violating Brazil's Constitution and Virtual Assets Law, as stablecoins are not considered fiat currency.",
+          "publishedAt": "Sat, 14 Mar 2026 14:58:14 +0000"
+        },
+        {
+          "title": "The math behind Strategy’s path to 1 million bitcoin by the end of 2026",
+          "url": "https://www.coindesk.com/markets/2026/03/14/the-math-behind-strategy-s-path-to-1-million-bitcoin-by-the-end-of-2026",
+          "description": "The largest publicly traded corporate holder of bitcoin would need to buy roughly 6,158 BTC per week, about $523 million, to reach the milestone by Dec. 31.",
+          "publishedAt": "Sat, 14 Mar 2026 14:00:00 +0000"
+        },
+        {
+          "title": "AI developers may not be keen on crypto, but stablecoins are the secret to agentic finance, crypto insiders say",
+          "url": "https://www.coindesk.com/business/2026/03/14/ai-developers-may-not-be-keen-on-crypto-but-stablecoins-are-the-secret-to-agentic-finance-crypto-insiders-say",
+          "description": "The brave new world of autonomous, micro-transacting AI agents is where programmable cryptocurrencies will shine, according to stablecoin experts.",
+          "publishedAt": "Sat, 14 Mar 2026 14:00:00 +0000"
+        },
+        {
+          "title": "Bitcoin holds $71,000 despite Trump warning of strikes on Iran's oil-rich Kharg Island",
+          "url": "https://www.coindesk.com/markets/2026/03/14/bitcoin-holds-usd71-000-despite-trump-warning-after-iran-oil-strikes",
+          "description": "The largest cryptocurrency is up 4.2% on the week despite Friday's reversal, with attention now turning to the Fed meeting on March 17-18 and whether oil above $100 forces a shift in rate expectations.",
+          "publishedAt": "Sat, 14 Mar 2026 06:08:27 +0000"
+        },
+        {
+          "title": "Bitcoin can survive 72% of the world's submarine cables being cut, but a targeted attack on five hosting providers could cripple it",
+          "url": "https://www.coindesk.com/markets/2026/03/13/bitcoin-can-survive-72-of-the-world-s-submarine-cables-being-cut-but-a-targeted-attack-on-five-hosting-providers-could-cripple-it",
+          "description": "A Cambridge study spanning 11 years and 68 verified cable failures found that Bitcoin's physical infrastructure is far more resilient than previously understood, with TOR adoption actually strengthening the network.",
+          "publishedAt": "Sat, 14 Mar 2026 03:30:00 +0000"
+        }
+      ],
+      "scrapedAt": "2026-03-14T20:08:11.018Z"
+    }
+  ],
+  "totalItems": 100,
+  "failedSources": [
+    "tiktok"
+  ]
 }

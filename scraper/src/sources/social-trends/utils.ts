@@ -46,40 +46,47 @@ export function stripHtml(html: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#8217;/g, "\u2019")
+    .replace(/&#8220;/g, "\u201C")
+    .replace(/&#8221;/g, "\u201D")
     .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 /** Remove script, style, nav, header, footer blocks from HTML */
-function cleanHtml(html: string): string {
+export function cleanHtml(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
     .replace(/<header[\s\S]*?<\/header>/gi, "")
     .replace(/<footer[\s\S]*?<\/footer>/gi, "");
 }
 
 /** Try to extract main content area, falling back to cleaned full HTML */
-function getContentArea(html: string): string {
-  // Try <article> first, then <main>, then fall back to cleaned HTML
-  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+export function getContentArea(html: string): string {
+  const cleaned = cleanHtml(html);
+
+  // Try <article> first, then <main>
+  const articleMatch = cleaned.match(/<article[\s\S]*<\/article>/i);
   if (articleMatch) return articleMatch[0];
 
-  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  const mainMatch = cleaned.match(/<main[\s\S]*<\/main>/i);
   if (mainMatch) return mainMatch[0];
 
   // Look for common content wrapper class names
-  const contentMatch = html.match(/<div[^>]*class="[^"]*(?:post-content|entry-content|article-content|blog-content|page-content)[^"]*"[\s\S]*?(?=<div[^>]*class="[^"]*(?:sidebar|footer|related))/i);
+  const contentMatch = cleaned.match(/<div[^>]*class="[^"]*(?:post-content|entry-content|article-content|blog-content|page-content|rich-text)[^"]*"[\s\S]*?(?=<div[^>]*class="[^"]*(?:sidebar|footer|related))/i);
   if (contentMatch) return contentMatch[0];
 
-  return cleanHtml(html);
+  return cleaned;
 }
 
-const BOILERPLATE = new Set([
+const BOILERPLATE_TERMS = [
   "table of contents", "about the author", "related posts", "share this",
-  "leave a comment", "subscribe", "newsletter", "final thoughts",
+  "leave a comment", "subscribe", "newsletter sign", "final thoughts",
   "conclusion", "wrapping up", "frequently asked", "faq", "faqs",
   "join the community", "join the pod", "no card required",
   "out of post ideas", "network integrations", "pricing",
@@ -87,40 +94,42 @@ const BOILERPLATE = new Set([
   "our work", "our creator network", "influencer marketing platform",
   "full-service programs", "get started", "sign up", "log in",
   "contact us", "resources", "featured", "popular posts",
-]);
+  "more instagram resources", "read more articles",
+  "ready to participate", "free social media calendar",
+];
 
-function isBoilerplate(title: string): boolean {
+export function isBoilerplate(title: string): boolean {
   const lower = title.toLowerCase();
-  if (lower.length < 5 || lower.length > 150) return true;
-  for (const term of BOILERPLATE) {
+  if (lower.length < 4 || lower.length > 200) return true;
+  for (const term of BOILERPLATE_TERMS) {
     if (lower === term || lower.includes(term)) return true;
   }
-  // Skip if it's just a single generic word
+  // Skip single words
   if (lower.split(/\s+/).length <= 1) return true;
   return false;
 }
 
 /**
- * Extract trend items from blog HTML.
- * Strips scripts/nav, finds content area, extracts h2/h3 + following <p>.
+ * Extract trend items from blog HTML using h2/h3 headings + following <p>.
+ * Handles multiline headings (SocialBee pattern).
  */
 export function extractHeadings(
   html: string,
   sourceUrl: string,
   platform?: string,
-  maxItems = 25,
+  maxItems = 30,
 ): ScrapedItem[] {
   const items: ScrapedItem[] = [];
   const content = getContentArea(html);
 
-  // Split by headings to get heading + content pairs
+  // Split by h2/h3 opening tags
   const sections = content.split(/<h[23][^>]*>/i);
 
   for (let i = 1; i < sections.length && items.length < maxItems; i++) {
     const section = sections[i];
 
-    // Extract heading text (everything before closing tag)
-    const headingMatch = section.match(/^(.*?)<\/h[23]>/is);
+    // Extract heading text (everything before closing tag — /s for multiline)
+    const headingMatch = section.match(/^([\s\S]*?)<\/h[23]>/i);
     if (!headingMatch) continue;
 
     const title = stripHtml(headingMatch[1]).slice(0, 200);
@@ -128,8 +137,8 @@ export function extractHeadings(
 
     // Get first paragraph after the heading as description
     const afterHeading = section.slice(headingMatch[0].length);
-    const pMatch = afterHeading.match(/<p[^>]*>(.*?)<\/p>/is);
-    const description = pMatch ? stripHtml(pMatch[1]).slice(0, 300) : "";
+    const pMatch = afterHeading.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    const description = pMatch ? stripHtml(pMatch[1]).slice(0, 500) : "";
 
     items.push({
       title,
@@ -144,4 +153,29 @@ export function extractHeadings(
   }
 
   return items;
+}
+
+/** Build a standard SourceResult */
+export function makeResult(
+  source: string,
+  items: ScrapedItem[],
+  error?: string,
+) {
+  return {
+    source,
+    status: (items.length > 0 ? "ok" : "error") as "ok" | "error",
+    error: items.length === 0 ? error ?? "No trends extracted" : undefined,
+    items,
+    scrapedAt: new Date().toISOString(),
+  };
+}
+
+/** Build an empty OK result (page unchanged / 304) */
+export function makeUnchangedResult(source: string) {
+  return {
+    source,
+    status: "ok" as const,
+    items: [] as ScrapedItem[],
+    scrapedAt: new Date().toISOString(),
+  };
 }

@@ -193,13 +193,6 @@ async function main() {
         allResults.push(r);
       }
 
-      console.log("\n📱 Social trend RSS feeds...");
-      const socialRssResults = await socialTrends.collectRss(runType);
-      for (const r of socialRssResults) {
-        const icon = r.status === "ok" ? "✅" : r.status === "skipped" ? "⏭️" : "❌";
-        console.log(`   ${icon} ${r.source}: ${r.items.length} items`);
-        allResults.push(r);
-      }
     }
 
     if (p === "region") {

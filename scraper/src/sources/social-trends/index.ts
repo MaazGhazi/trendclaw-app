@@ -1,59 +1,72 @@
 import type { RunType, SourceResult } from "../../types.js";
-import { collectRssFeeds } from "./rss-feeds.js";
-import { filterNewPageItems } from "./content-cache.js";
-import * as later from "./later.js";
-import * as newEngen from "./new-engen.js";
-import * as socialbee from "./socialbee.js";
-import * as heyorca from "./heyorca.js";
+import { trackAndTagItems } from "./supabase-cache.js";
 import * as ramdam from "./ramdam.js";
+import * as later from "./later.js";
+import * as quso from "./quso.js";
+import * as socialbee from "./socialbee.js";
+import * as socialpilot from "./socialpilot.js";
+import * as bluebear from "./bluebear.js";
 
-// ─── HTML blog scrapers ─────────────────────────────────────────
+// ─── Source registry ────────────────────────────────────────────
 
 interface BlogSource {
   name: string;
   collect: (rt: RunType) => Promise<SourceResult>;
 }
 
-const BLOG_SOURCES: BlogSource[] = [
-  { name: "later", collect: later.collect },
-  { name: "new-engen", collect: newEngen.collect },
-  { name: "socialbee", collect: socialbee.collect },
-  { name: "heyorca", collect: heyorca.collect },
+const SOURCES: BlogSource[] = [
   { name: "ramdam", collect: ramdam.collect },
+  { name: "later", collect: later.collect },
+  { name: "quso", collect: quso.collect },
+  { name: "socialbee", collect: socialbee.collect },
+  { name: "socialpilot", collect: socialpilot.collect },
+  { name: "bluebear", collect: bluebear.collect },
 ];
 
 // ─── Public API ─────────────────────────────────────────────────
 
-/** Collect all HTML-scraped blog trend pages (deep_dive only) */
+/**
+ * Collect all social trend blog pages.
+ *
+ * - Runs all sources in parallel (HTTP 304 skips unchanged pages)
+ * - Tracks items in Supabase (new vs recurring)
+ * - Tags each item with isNew + firstSeenAt for the agent
+ * - Always passes ALL items through (frontend keeps showing trends)
+ */
 export async function collect(runType: RunType): Promise<SourceResult> {
   const results = await Promise.allSettled(
-    BLOG_SOURCES.map((s) => s.collect(runType)),
+    SOURCES.map((s) => s.collect(runType)),
   );
 
-  // Merge all items from fulfilled sources
-  const allItems = results
-    .filter((r): r is PromiseFulfilledResult<SourceResult> => r.status === "fulfilled")
-    .flatMap((r) => r.value.items);
+  const fulfilled = results
+    .filter((r): r is PromiseFulfilledResult<SourceResult> => r.status === "fulfilled");
 
-  const errors = results
-    .filter((r): r is PromiseFulfilledResult<SourceResult> => r.status === "fulfilled")
+  // Tag each item with its source name for Supabase storage
+  const allItems = fulfilled.flatMap((r) =>
+    r.value.items.map((item) => ({
+      ...item,
+      extra: { ...item.extra, sourceName: r.value.source },
+    })),
+  );
+
+  const errors = fulfilled
     .filter((r) => r.value.status === "error")
     .map((r) => `${r.value.source}: ${r.value.error}`);
 
-  // Item-level dedup for blog pages (catches partial page updates)
-  const newItems = filterNewPageItems("__blog_combined__", allItems);
+  // Log per-source counts
+  for (const r of fulfilled) {
+    const icon = r.value.status === "ok" ? "✅" : "❌";
+    console.log(`   ${icon} ${r.value.source}: ${r.value.items.length} items`);
+  }
+
+  // Track in Supabase and tag new vs recurring
+  const taggedItems = await trackAndTagItems(allItems);
 
   return {
     source: "Social Trend Blogs",
-    status: allItems.length > 0 || newItems.length > 0 ? "ok" : "error",
+    status: taggedItems.length > 0 ? "ok" : "error",
     error: errors.length > 0 ? errors.join("; ") : undefined,
-    items: newItems,
+    items: taggedItems,
     scrapedAt: new Date().toISOString(),
   };
-}
-
-/** Collect all social trend RSS feeds (blogs + newsletters) */
-export async function collectRss(runType: RunType): Promise<SourceResult[]> {
-  // Date-based dedup is handled inside rss-feeds.ts per feed
-  return collectRssFeeds(runType);
 }
