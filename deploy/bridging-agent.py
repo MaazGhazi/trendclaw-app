@@ -125,20 +125,68 @@ def load_sounds(sources_dir):
     return sounds
 
 
+def parse_iso_date(val):
+    """Parse an ISO-ish date string to datetime. Returns None on failure."""
+    if not val or not isinstance(val, str):
+        return None
+    try:
+        ts = val.replace("Z", "+00:00")
+        if "T" not in ts:
+            ts += "T00:00:00+00:00"
+        elif "+" not in ts[10:] and "-" not in ts[10:]:
+            ts += "+00:00"
+        return datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return None
+
+
+# Matches dates like "January 12, 2026", "February 20, 2026", "March 3, 2026"
+import re as _re
+_MONTH_NAMES = {
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+}
+_EMBEDDED_DATE_RE = _re.compile(
+    r'\b(' + '|'.join(_MONTH_NAMES.keys()) + r')\s+(\d{1,2}),?\s+(\d{4})\b',
+    _re.IGNORECASE,
+)
+
+
+def parse_embedded_date(text):
+    """Extract a date like 'January 12, 2026' from text. Returns datetime or None."""
+    if not text:
+        return None
+    match = _EMBEDDED_DATE_RE.search(text)
+    if match:
+        month = _MONTH_NAMES.get(match.group(1).lower())
+        day = int(match.group(2))
+        year = int(match.group(3))
+        if month:
+            try:
+                return datetime(year, month, day, tzinfo=timezone.utc)
+            except ValueError:
+                pass
+    return None
+
+
 def parse_item_date(item):
-    """Extract the most relevant date from a format/sound item. Returns datetime or None."""
+    """Extract the most relevant date from a format/sound item.
+    Checks embedded dates in title/description first (actual content date),
+    then falls back to scraper metadata dates."""
+    # Priority 1: embedded date in title or description (the actual format date)
+    for text_key in ("title", "description"):
+        text = item.get(text_key, "") or ""
+        dt = parse_embedded_date(text)
+        if dt:
+            return dt
+
+    # Priority 2: scraper metadata dates
     for key in ("firstSeenAt", "lastSeenAt", "first_seen_at", "last_seen_at"):
         val = item.get(key) or item.get("extra", {}).get(key)
-        if val and isinstance(val, str):
-            try:
-                ts = val.replace("Z", "+00:00")
-                if "T" not in ts:
-                    ts += "T00:00:00+00:00"
-                elif "+" not in ts[10:] and "-" not in ts[10:]:
-                    ts += "+00:00"
-                return datetime.fromisoformat(ts)
-            except (ValueError, TypeError):
-                continue
+        dt = parse_iso_date(val)
+        if dt:
+            return dt
+
     return None
 
 
@@ -239,26 +287,44 @@ def select_top_sounds(sounds, max_count=10):
     return sounds_sorted[:max_count]
 
 
-def extract_topics(orchestrated_data, max_count=25):
-    """Extract top topics from niche_view (direct + adjacent) or categories."""
-    topics = []
+def extract_topics(orchestrated_data, max_count=50):
+    """Extract top topics: niche_view first (prioritized), then fill from all categories."""
+    seen_titles = set()
+    prioritized = []
+    general = []
 
+    # Priority: niche_view direct + adjacent (most relevant to user)
     niche_view = orchestrated_data.get("niche_view")
     if niche_view:
-        direct = niche_view.get("direct", [])
-        adjacent = niche_view.get("adjacent", [])
-        topics.extend(direct)
-        topics.extend(adjacent)
-    else:
-        # Fallback to categories
-        for cat in orchestrated_data.get("categories", []):
-            topics.extend(cat.get("trends", []))
+        for t in niche_view.get("direct", []):
+            key = t.get("title", "").lower().strip()
+            if key not in seen_titles:
+                seen_titles.add(key)
+                prioritized.append(t)
+        for t in niche_view.get("adjacent", []):
+            key = t.get("title", "").lower().strip()
+            if key not in seen_titles:
+                seen_titles.add(key)
+                prioritized.append(t)
 
-    # Sort by score descending
-    topics.sort(
+    # Fill remaining from ALL categories (GPT-4o may find creative angles)
+    for cat in orchestrated_data.get("categories", []):
+        for t in cat.get("trends", []):
+            key = t.get("title", "").lower().strip()
+            if key not in seen_titles:
+                seen_titles.add(key)
+                general.append(t)
+
+    # Sort each group by score
+    prioritized.sort(
+        key=lambda t: t.get("popularity", {}).get("score", 0), reverse=True
+    )
+    general.sort(
         key=lambda t: t.get("popularity", {}).get("score", 0), reverse=True
     )
 
+    # Combine: all prioritized + top general to fill max_count
+    topics = prioritized + general
     return topics[:max_count]
 
 
@@ -297,8 +363,8 @@ def build_prompt(topics, formats, sounds, user_profile):
         '"sound_idx": null, ...fields per type}], '
         '"participation": [{"type": "participation", "format_idx": 0, ...}], '
         '"watch_signals": [{"type": "watch_signal", "sound_idx": 0, ...}]}\n\n'
-        "Limits: max 5 full_brief, 3 angle_only, 3 participation, "
-        "2 opportunity_flag, 2 watch_signal.\n"
+        "Generate a brief for EVERY topic and EVERY format provided. "
+        "Do not skip any. More briefs = better. There is no maximum.\n"
         "Hooks must be specific and actionable. Reference the user's platform and niche.\n"
         "IMPORTANT: Only use formats that are genuinely current (last 7 days preferred). "
         "Never recommend a format that is clearly outdated or seasonal from months ago."
@@ -573,8 +639,8 @@ def run_bridging(orchestrated_file, sources_dir, user_profile_file, run_type, ou
     formats = load_formats(sources_dir)
     sounds = load_sounds(sources_dir)
 
-    selected_formats = select_top_formats(formats)
-    selected_sounds = select_top_sounds(sounds)
+    selected_formats = select_top_formats(formats, max_count=40)
+    selected_sounds = select_top_sounds(sounds, max_count=20)
 
     print(
         f"  Bridging inputs: {len(topics)} topics, "
@@ -638,7 +704,7 @@ def run_bridging(orchestrated_file, sources_dir, user_profile_file, run_type, ou
     for brief in curated_view:
         brief["_rank"] = compute_rank(brief)
     curated_view.sort(key=lambda b: b.get("_rank", 0), reverse=True)
-    curated_view = curated_view[:5]
+    # No cap — show everything
 
     # Clean up internal ranking field
     for brief in curated_view:
