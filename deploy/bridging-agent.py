@@ -506,13 +506,26 @@ def resolve_brief(brief, topics, formats, sounds):
         if key in brief:
             brief_content[key] = brief[key]
 
+    # Ensure confidence is always a float
+    if "confidence" in brief_content:
+        try:
+            brief_content["confidence"] = float(brief_content["confidence"])
+        except (TypeError, ValueError):
+            brief_content["confidence"] = 0.5
+    else:
+        brief_content["confidence"] = 0.5
+
     resolved["brief"] = brief_content
     return resolved
 
 
 def compute_rank(brief):
     """Compute composite rank for curated view sorting."""
-    confidence = brief.get("brief", {}).get("confidence", 0.5)
+    raw_confidence = brief.get("brief", {}).get("confidence", 0.5)
+    try:
+        confidence = float(raw_confidence)
+    except (TypeError, ValueError):
+        confidence = 0.5
     trend = brief.get("trend")
     trend_score = 0
     momentum = "stable"
