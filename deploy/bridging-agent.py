@@ -1,0 +1,610 @@
+#!/usr/bin/env python3
+"""
+TrendClaw Bridging Agent — output type classification + content briefs.
+
+Reads _orchestrated.json + format/sound sources, classifies each trend into
+one of five output types, and generates actionable content briefs via GPT-4o.
+
+Pipeline position: Scoring → Orchestration → BRIDGING → Summary → Store
+
+No external dependencies — stdlib only.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+from urllib.request import Request, urlopen
+
+
+# ─── Output type definitions ────────────────────────────────────────────────
+
+OUTPUT_TYPES = {
+    "full_brief": {"priority": 5, "min_confidence": 0.85, "max_count": 5},
+    "angle_only": {"priority": 4, "min_confidence": 0.7, "max_count": 3},
+    "participation": {"priority": 3, "min_confidence": 0.6, "max_count": 3},
+    "opportunity_flag": {"priority": 2, "min_confidence": 0.5, "max_count": 2},
+    "watch_signal": {"priority": 1, "min_confidence": 0.5, "max_count": 2},
+}
+
+
+def load_orchestrated(path):
+    """Load orchestrated JSON data."""
+    with open(path) as f:
+        return json.load(f)
+
+
+def load_user_profile(path):
+    """Load user profile JSON."""
+    with open(path) as f:
+        return json.load(f)
+
+
+def load_formats(sources_dir):
+    """Load format items from social_trend_blogs source file."""
+    formats = []
+
+    # Find social trend blogs file via manifest
+    manifest_path = os.path.join(sources_dir, "_manifest.json")
+    if not os.path.exists(manifest_path):
+        return formats
+
+    try:
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+    except Exception:
+        return formats
+
+    blog_file = None
+    for entry in manifest:
+        name = entry.get("name", "")
+        if "blog" in name.lower() or "social_trend" in name.lower():
+            blog_file = entry.get("file")
+            break
+
+    if not blog_file or not os.path.exists(blog_file):
+        # Try common filename
+        for candidate in ["social_trend_blogs.json", "social-trend-blogs.json"]:
+            p = os.path.join(sources_dir, candidate)
+            if os.path.exists(p):
+                blog_file = p
+                break
+
+    if not blog_file or not os.path.exists(blog_file):
+        return formats
+
+    try:
+        with open(blog_file) as f:
+            data = json.load(f)
+        items = data.get("items", []) if isinstance(data, dict) else data
+        if isinstance(items, list):
+            formats = items
+    except Exception:
+        pass
+
+    return formats
+
+
+def load_sounds(sources_dir):
+    """Load sound items from TikTok source (category == 'song')."""
+    sounds = []
+
+    manifest_path = os.path.join(sources_dir, "_manifest.json")
+    if not os.path.exists(manifest_path):
+        return sounds
+
+    try:
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+    except Exception:
+        return sounds
+
+    tiktok_file = None
+    for entry in manifest:
+        name = entry.get("name", "")
+        if "tiktok" in name.lower():
+            tiktok_file = entry.get("file")
+            break
+
+    if not tiktok_file or not os.path.exists(tiktok_file):
+        return sounds
+
+    try:
+        with open(tiktok_file) as f:
+            data = json.load(f)
+        items = data.get("items", []) if isinstance(data, dict) else data
+        for item in (items if isinstance(items, list) else []):
+            cat = item.get("category", "")
+            if cat and "song" in cat.lower():
+                sounds.append(item)
+    except Exception:
+        pass
+
+    return sounds
+
+
+def select_top_formats(formats, max_count=20):
+    """Select top format items, preferring new ones and longer descriptions."""
+    scored = []
+    for f in formats:
+        s = 0
+        if f.get("isNew") or f.get("extra", {}).get("isNew"):
+            s += 10
+        desc = f.get("description", "") or ""
+        s += min(len(desc), 300) / 30  # up to 10 pts for description length
+        platform = f.get("platform") or f.get("extra", {}).get("platform", "")
+        scored.append((s, platform, f))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    # Balance across platforms
+    selected = []
+    platform_counts = {}
+    for s, plat, f in scored:
+        if len(selected) >= max_count:
+            break
+        plat_key = plat or "unknown"
+        if platform_counts.get(plat_key, 0) >= max_count // 3 + 1:
+            continue
+        selected.append(f)
+        platform_counts[plat_key] = platform_counts.get(plat_key, 0) + 1
+
+    # Fill remaining slots
+    if len(selected) < max_count:
+        for s, plat, f in scored:
+            if f not in selected and len(selected) < max_count:
+                selected.append(f)
+
+    return selected
+
+
+def select_top_sounds(sounds, max_count=10):
+    """Select top sounds sorted by play count."""
+    def get_plays(s):
+        v = s.get("views", 0) or s.get("extra", {}).get("play_cnt", 0) or 0
+        if isinstance(v, str):
+            try:
+                v = int(v)
+            except ValueError:
+                v = 0
+        return v
+
+    sounds_sorted = sorted(sounds, key=get_plays, reverse=True)
+    return sounds_sorted[:max_count]
+
+
+def extract_topics(orchestrated_data, max_count=25):
+    """Extract top topics from niche_view (direct + adjacent) or categories."""
+    topics = []
+
+    niche_view = orchestrated_data.get("niche_view")
+    if niche_view:
+        direct = niche_view.get("direct", [])
+        adjacent = niche_view.get("adjacent", [])
+        topics.extend(direct)
+        topics.extend(adjacent)
+    else:
+        # Fallback to categories
+        for cat in orchestrated_data.get("categories", []):
+            topics.extend(cat.get("trends", []))
+
+    # Sort by score descending
+    topics.sort(
+        key=lambda t: t.get("popularity", {}).get("score", 0), reverse=True
+    )
+
+    return topics[:max_count]
+
+
+def format_number(n):
+    """Format a number with K/M suffixes."""
+    if not isinstance(n, (int, float)) or n <= 0:
+        return "0"
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    elif n >= 1_000:
+        return f"{n/1_000:.1f}K"
+    return str(int(n))
+
+
+def build_prompt(topics, formats, sounds, user_profile):
+    """Build system + user prompts for GPT-4o."""
+
+    system_prompt = (
+        "You are a content strategist for social media creators. "
+        "You bridge trending TOPICS with trending content FORMATS and SOUNDS "
+        "to produce actionable briefs.\n\n"
+        "Match what's trending (topics) with how to make content about it (formats/sounds).\n\n"
+        "Classify each output as exactly ONE type:\n"
+        "- full_brief: Topic + format match. Include: hook, angle, why_now, "
+        "timing_window, lifecycle_stage (emerging|growing|peak|saturated), "
+        "saturation (low|medium|high), confidence.\n"
+        "- angle_only: Topic trending, no format match. First-mover opportunity. "
+        "Include: angle, why_now, confidence.\n"
+        "- participation: Format/sound trending on its own — no topic needed. "
+        "Creator applies to their niche. Include: how_to_apply, timing_window, confidence.\n"
+        "- opportunity_flag: Massive topic, weak niche match. Include: angle, confidence.\n"
+        "- watch_signal: Sound/format velocity spiking, too early to brief. "
+        "Include: signal, confidence.\n\n"
+        'Return ONLY JSON:\n'
+        '{"briefs": [{"type": "...", "topic_idx": 0, "format_idx": null, '
+        '"sound_idx": null, ...fields per type}], '
+        '"participation": [{"type": "participation", "format_idx": 0, ...}], '
+        '"watch_signals": [{"type": "watch_signal", "sound_idx": 0, ...}]}\n\n'
+        "Limits: max 5 full_brief, 3 angle_only, 3 participation, "
+        "2 opportunity_flag, 2 watch_signal.\n"
+        "Hooks must be specific and actionable. Reference the user's platform and niche."
+    )
+
+    # User section
+    niche = user_profile.get("niche", "tech")
+    role = user_profile.get("role", "creator")
+    platforms = ", ".join(user_profile.get("platforms", [])) or "general"
+    content_formats = ", ".join(user_profile.get("content_formats", [])) or "any"
+    keywords = ", ".join(user_profile.get("keywords", [])) or "none specified"
+
+    lines = [
+        f"USER: Niche: {niche} | Role: {role} | Platforms: {platforms} "
+        f"| Formats: {content_formats} | Keywords: {keywords}",
+        "",
+        "TOPICS:",
+    ]
+
+    for i, t in enumerate(topics):
+        score = t.get("popularity", {}).get("score", 0)
+        momentum = t.get("momentum", "stable")
+        sources = ",".join(t.get("sources", [])[:3])
+        orch = t.get("orchestration", {})
+        niche_match = orch.get("niche_match", "direct")
+        angle = orch.get("suggested_angle", "")
+        why = (t.get("why_trending", "") or "")[:100]
+
+        niche_str = niche_match
+        if niche_match == "adjacent" and angle:
+            niche_str = f'adjacent(angle:"{angle[:60]}")'
+
+        lines.append(
+            f'[{i}] "{t.get("title", "")[:80]}" | score:{score} | '
+            f"momentum:{momentum} | sources:{sources} | "
+            f"niche:{niche_str} | why:{why}"
+        )
+
+    if formats:
+        lines.append("")
+        lines.append("FORMATS:")
+        for i, f in enumerate(formats):
+            platform = f.get("platform") or f.get("extra", {}).get("platform", "social")
+            is_new = f.get("isNew") or f.get("extra", {}).get("isNew", False)
+            new_tag = ", new" if is_new else ""
+            desc = (f.get("description", "") or "")[:120]
+            lines.append(
+                f'[F{i}] "{f.get("title", "")[:60]}" ({platform}{new_tag}) — {desc}'
+            )
+
+    if sounds:
+        lines.append("")
+        lines.append("SOUNDS:")
+        for i, s in enumerate(sounds):
+            plays = s.get("views", 0) or s.get("extra", {}).get("play_cnt", 0) or 0
+            artist = s.get("description", "") or s.get("extra", {}).get("artist", "")
+            lines.append(
+                f'[S{i}] "{s.get("title", "")[:50]}" by {artist[:30]} — '
+                f"{format_number(plays)} plays"
+            )
+
+    user_prompt = "\n".join(lines)
+    return system_prompt, user_prompt
+
+
+def call_gpt4o(system_prompt, user_prompt, api_key):
+    """Call GPT-4o for creative bridging."""
+    body = json.dumps({
+        "model": "gpt-4o",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.7,
+        "response_format": {"type": "json_object"},
+    }).encode()
+
+    req = Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    start = time.time()
+    resp = urlopen(req, timeout=90)
+    result = json.loads(resp.read().decode())
+    content = result["choices"][0]["message"]["content"]
+    elapsed = time.time() - start
+
+    parsed = json.loads(content)
+    return parsed, elapsed
+
+
+def resolve_brief(brief, topics, formats, sounds):
+    """Resolve index references in a brief to actual data."""
+    resolved = {"output_type": brief.get("type", "angle_only")}
+
+    # Resolve topic
+    topic_idx = brief.get("topic_idx")
+    if topic_idx is not None and 0 <= topic_idx < len(topics):
+        resolved["trend"] = topics[topic_idx]
+    else:
+        resolved["trend"] = None
+
+    # Resolve format
+    format_idx = brief.get("format_idx")
+    if format_idx is not None and 0 <= format_idx < len(formats):
+        f = formats[format_idx]
+        resolved["format"] = {
+            "name": f.get("title", ""),
+            "description": f.get("description", ""),
+            "platform": f.get("platform") or f.get("extra", {}).get("platform"),
+        }
+    else:
+        resolved["format"] = None
+
+    # Resolve sound
+    sound_idx = brief.get("sound_idx")
+    if sound_idx is not None and 0 <= sound_idx < len(sounds):
+        s = sounds[sound_idx]
+        plays = s.get("views", 0) or s.get("extra", {}).get("play_cnt", 0) or 0
+        resolved["sound"] = {
+            "name": s.get("title", ""),
+            "plays": plays,
+            "artist": s.get("description", "") or s.get("extra", {}).get("artist", ""),
+        }
+    else:
+        resolved["sound"] = None
+
+    # Brief content fields
+    brief_content = {}
+    for key in ("hook", "angle", "why_now", "timing_window", "lifecycle_stage",
+                "saturation", "how_to_apply", "signal", "confidence"):
+        if key in brief:
+            brief_content[key] = brief[key]
+
+    resolved["brief"] = brief_content
+    return resolved
+
+
+def compute_rank(brief):
+    """Compute composite rank for curated view sorting."""
+    confidence = brief.get("brief", {}).get("confidence", 0.5)
+    trend = brief.get("trend")
+    trend_score = 0
+    momentum = "stable"
+    niche_match = "none"
+
+    if trend:
+        trend_score = trend.get("popularity", {}).get("score", 0)
+        momentum = trend.get("momentum", "stable")
+        orch = trend.get("orchestration", {})
+        niche_match = orch.get("niche_match", "none")
+
+    type_bonus = {
+        "full_brief": 0.2,
+        "angle_only": 0.1,
+        "opportunity_flag": 0.0,
+    }.get(brief.get("output_type", ""), 0.0)
+
+    niche_bonus = {
+        "direct": 0.15,
+        "adjacent": 0.05,
+    }.get(niche_match, 0.0)
+
+    momentum_bonus = {
+        "viral": 0.1,
+        "rising": 0.05,
+        "new": 0.03,
+    }.get(momentum, 0.0)
+
+    rank = (
+        confidence * 0.4
+        + (trend_score / 100) * 0.3
+        + type_bonus
+        + niche_bonus
+        + momentum_bonus
+    )
+    return rank
+
+
+def generate_fallback_briefs(topics, user_profile):
+    """Generate basic angle_only briefs from orchestration data when 4o fails."""
+    briefs = []
+    niche = user_profile.get("niche", "tech")
+
+    for topic in topics[:5]:
+        orch = topic.get("orchestration", {})
+        suggested = orch.get("suggested_angle")
+        niche_match = orch.get("niche_match", "none")
+
+        if niche_match == "none":
+            continue
+
+        brief = {
+            "output_type": "angle_only",
+            "trend": topic,
+            "format": None,
+            "sound": None,
+            "brief": {
+                "angle": suggested or f"Cover this trending topic for your {niche} audience",
+                "why_now": topic.get("why_trending", "Currently trending"),
+                "confidence": 0.4,
+            },
+        }
+        briefs.append(brief)
+
+    return briefs
+
+
+def build_raw_view(topics, formats, sounds):
+    """Build the raw view with all items labeled."""
+    raw_topics = []
+    for t in topics:
+        raw_topics.append({
+            "title": t.get("title", ""),
+            "description": t.get("description", ""),
+            "score": t.get("popularity", {}).get("score", 0),
+            "momentum": t.get("momentum", "stable"),
+            "sources": t.get("sources", []),
+        })
+
+    raw_formats = []
+    for f in formats:
+        raw_formats.append({
+            "title": f.get("title", ""),
+            "description": f.get("description", ""),
+            "platform": f.get("platform") or f.get("extra", {}).get("platform"),
+            "isNew": bool(f.get("isNew") or f.get("extra", {}).get("isNew")),
+        })
+
+    raw_sounds = []
+    for s in sounds:
+        plays = s.get("views", 0) or s.get("extra", {}).get("play_cnt", 0) or 0
+        raw_sounds.append({
+            "title": s.get("title", ""),
+            "plays": plays,
+            "artist": s.get("description", "") or s.get("extra", {}).get("artist", ""),
+        })
+
+    return {
+        "topics": raw_topics,
+        "formats": raw_formats,
+        "sounds": raw_sounds,
+    }
+
+
+# ─── Main bridging pipeline ─────────────────────────────────────────────────
+
+def run_bridging(orchestrated_file, sources_dir, user_profile_file, run_type, output_file):
+    """Main bridging pipeline."""
+    orchestrated = load_orchestrated(orchestrated_file)
+    user_profile = load_user_profile(user_profile_file)
+
+    # Default user → skip bridging (copy orchestrated → bridged)
+    user_id = user_profile.get("user_id", "default")
+    if user_id == "default":
+        with open(output_file, "w") as f:
+            json.dump(orchestrated, f)
+        print("  Bridging: skipped (default user, no profile)", file=sys.stderr)
+        return
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+
+    # Extract data sources
+    topics = extract_topics(orchestrated)
+    formats = load_formats(sources_dir)
+    sounds = load_sounds(sources_dir)
+
+    selected_formats = select_top_formats(formats)
+    selected_sounds = select_top_sounds(sounds)
+
+    print(
+        f"  Bridging inputs: {len(topics)} topics, "
+        f"{len(selected_formats)} formats, {len(selected_sounds)} sounds",
+        file=sys.stderr,
+    )
+
+    if not topics:
+        with open(output_file, "w") as f:
+            json.dump(orchestrated, f)
+        print("  Bridging: skipped (no topics)", file=sys.stderr)
+        return
+
+    # Build raw view (always available)
+    raw_view = build_raw_view(topics, selected_formats, selected_sounds)
+
+    curated_view = []
+    participation = []
+    watch_signals = []
+
+    # Try GPT-4o for creative bridging
+    if api_key:
+        try:
+            system_prompt, user_prompt = build_prompt(
+                topics, selected_formats, selected_sounds, user_profile
+            )
+            response, elapsed = call_gpt4o(system_prompt, user_prompt, api_key)
+
+            # Process briefs
+            for brief in response.get("briefs", []):
+                resolved = resolve_brief(brief, topics, selected_formats, selected_sounds)
+                curated_view.append(resolved)
+
+            # Process participation
+            for brief in response.get("participation", []):
+                resolved = resolve_brief(brief, topics, selected_formats, selected_sounds)
+                resolved["output_type"] = "participation"
+                participation.append(resolved)
+
+            # Process watch signals
+            for brief in response.get("watch_signals", []):
+                resolved = resolve_brief(brief, topics, selected_formats, selected_sounds)
+                resolved["output_type"] = "watch_signal"
+                watch_signals.append(resolved)
+
+            print(
+                f"  GPT-4o: {len(curated_view)} briefs, "
+                f"{len(participation)} participation, "
+                f"{len(watch_signals)} watch signals ({elapsed:.1f}s)",
+                file=sys.stderr,
+            )
+
+        except Exception as e:
+            print(f"  GPT-4o failed: {str(e)[:120]} — using fallback", file=sys.stderr)
+            curated_view = generate_fallback_briefs(topics, user_profile)
+    else:
+        print("  No API key — using fallback briefs", file=sys.stderr)
+        curated_view = generate_fallback_briefs(topics, user_profile)
+
+    # Sort curated view by composite rank, take top 5
+    for brief in curated_view:
+        brief["_rank"] = compute_rank(brief)
+    curated_view.sort(key=lambda b: b.get("_rank", 0), reverse=True)
+    curated_view = curated_view[:5]
+
+    # Clean up internal ranking field
+    for brief in curated_view:
+        brief.pop("_rank", None)
+
+    # Build output (superset of orchestrated data)
+    orchestrated["curated_view"] = curated_view
+    orchestrated["participation"] = participation
+    orchestrated["watch_signals"] = watch_signals
+    orchestrated["raw_view"] = raw_view
+
+    with open(output_file, "w") as f:
+        json.dump(orchestrated, f)
+
+    print(
+        f"  Bridged: {len(curated_view)} curated, "
+        f"{len(participation)} participation, "
+        f"{len(watch_signals)} watch signals",
+        file=sys.stderr,
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="TrendClaw Bridging Agent")
+    parser.add_argument("--orchestrated-file", required=True, help="Path to _orchestrated.json")
+    parser.add_argument("--sources-dir", required=True, help="Dir with per-source raw scraper JSON")
+    parser.add_argument("--user-profile", required=True, help="Path to user profile JSON")
+    parser.add_argument("--run-type", required=True, help="Run type: pulse, digest, deep_dive")
+    parser.add_argument("--output", required=True, help="Output file path")
+    args = parser.parse_args()
+
+    run_bridging(
+        args.orchestrated_file,
+        args.sources_dir,
+        args.user_profile,
+        args.run_type,
+        args.output,
+    )

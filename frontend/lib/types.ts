@@ -2,6 +2,75 @@
 
 // --- Trend data types ---
 
+export interface OrchestrationMeta {
+  scale: "normal" | "massive";
+  niche_match: "direct" | "adjacent" | "none";
+  confidence: number;
+  suggested_angle: string | null;
+  reasoning: string;
+}
+
+export interface TrendItem {
+  title: string;
+  description: string;
+  why_trending: string;
+  momentum: string;
+  popularity: { score: number; metric: string; reach: string };
+  sources: string[];
+  urls: string[];
+  first_seen: string | null;
+  relevance: string;
+  orchestration?: OrchestrationMeta;
+}
+
+export interface GeneralViewTrend {
+  title: string;
+  description: string;
+  why_trending: string;
+  popularity: { score: number; metric: string; reach: string };
+  sources: string[];
+  urls: string[];
+  momentum: string;
+  relevance_to_user: string;
+  suggested_angle: string | null;
+}
+
+// --- Bridging agent types ---
+
+export type BriefOutputType = "full_brief" | "angle_only" | "participation" | "opportunity_flag" | "watch_signal";
+
+export interface BriefContent {
+  hook?: string;
+  angle?: string;
+  why_now?: string;
+  timing_window?: string;
+  lifecycle_stage?: "emerging" | "growing" | "peak" | "saturated";
+  saturation?: "low" | "medium" | "high";
+  how_to_apply?: string;
+  signal?: string;
+  confidence: number;
+}
+
+export interface FormatMatch {
+  name: string;
+  description: string;
+  platform?: string;
+}
+
+export interface SoundMatch {
+  name: string;
+  plays: number;
+  artist?: string;
+}
+
+export interface CuratedBrief {
+  output_type: BriefOutputType;
+  trend?: TrendItem | null;
+  format?: FormatMatch | null;
+  sound?: SoundMatch | null;
+  brief: BriefContent;
+}
+
 export interface TrendData {
   timestamp: string;
   type: string;
@@ -12,18 +81,22 @@ export interface TrendData {
   };
   categories: {
     name: string;
-    trends: Array<{
-      title: string;
-      description: string;
-      why_trending: string;
-      momentum: string;
-      popularity: { score: number; metric: string; reach: string };
-      sources: string[];
-      urls: string[];
-      first_seen: string | null;
-      relevance: string;
-    }>;
+    trends: TrendItem[];
   }[];
+  niche_view?: {
+    direct: TrendItem[];
+    adjacent: TrendItem[];
+  };
+  general_view?: GeneralViewTrend[];
+  filtered_count?: number;
+  curated_view?: CuratedBrief[];
+  participation?: CuratedBrief[];
+  watch_signals?: CuratedBrief[];
+  raw_view?: {
+    topics: { title: string; description: string; score: number; momentum: string; sources: string[] }[];
+    formats: { title: string; description: string; platform?: string; isNew: boolean }[];
+    sounds: { title: string; plays: number; artist?: string }[];
+  };
   top_movers: { title: string; direction: "up" | "down" | "new"; delta: string }[];
   signals: { emerging: string[]; fading: string[] };
   summary: string;
@@ -51,7 +124,7 @@ export interface UsersStep {
   status: "pending" | "running" | "completed";
   total: number;
   completed: number;
-  current_step?: "merging" | "analyzing" | "summarizing" | "storing";
+  current_step?: "merging" | "analyzing" | "scoring" | "personalizing" | "briefing" | "summarizing" | "storing";
 }
 
 export interface ProgressData {
@@ -175,8 +248,11 @@ export const STEP_NAMES: Record<string, string> = {
 export const USER_STEP_LABELS: Record<string, string> = {
   merging: "Merging source data",
   analyzing: "AI analyzing trends",
+  scoring: "Scoring trends",
+  personalizing: "Personalizing trends",
+  briefing: "Generating content briefs",
   summarizing: "Generating summary",
   storing: "Saving results",
 };
 
-export const USER_STEP_ORDER = ["merging", "analyzing", "summarizing", "storing"] as const;
+export const USER_STEP_ORDER = ["merging", "analyzing", "scoring", "personalizing", "briefing", "summarizing", "storing"] as const;

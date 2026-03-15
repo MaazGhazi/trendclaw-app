@@ -83,9 +83,9 @@ try:
     target = '${TARGET_USER_ID}'
     base = '${SUPABASE_URL}/rest/v1/profiles'
     if target:
-        url = base + '?user_id=eq.' + target + '&select=user_id,region,niche,platforms,role,keywords'
+        url = base + '?user_id=eq.' + target + '&select=user_id,region,niche,platforms,role,keywords,content_formats'
     else:
-        url = base + '?onboarding_complete=eq.true&select=user_id,region,niche,platforms,role,keywords'
+        url = base + '?onboarding_complete=eq.true&select=user_id,region,niche,platforms,role,keywords,content_formats'
     req = urllib.request.Request(url, headers={
         'apikey': '${SUPABASE_KEY}',
         'Authorization': 'Bearer ${SUPABASE_KEY}',
@@ -93,7 +93,7 @@ try:
     with urllib.request.urlopen(req, timeout=10) as resp:
         rows = json.loads(resp.read())
     if not rows:
-        rows = [{'user_id': 'default', 'region': 'US', 'niche': 'tech', 'platforms': [], 'role': 'creator', 'keywords': []}]
+        rows = [{'user_id': 'default', 'region': 'US', 'niche': 'tech', 'platforms': [], 'role': 'creator', 'keywords': [], 'content_formats': []}]
     with open('$USERS_FILE', 'w') as f:
         json.dump(rows, f)
     label = f'user {target}' if target else f'{len(rows)} active users'
@@ -101,10 +101,10 @@ try:
 except Exception as e:
     print(f'Supabase query failed: {e}, using default user')
     with open('$USERS_FILE', 'w') as f:
-        json.dump([{'user_id': 'default', 'region': 'US', 'niche': 'tech', 'platforms': [], 'role': 'creator', 'keywords': []}], f)
+        json.dump([{'user_id': 'default', 'region': 'US', 'niche': 'tech', 'platforms': [], 'role': 'creator', 'keywords': [], 'content_formats': []}], f)
 " 2>&1
 else
-  echo '[{"user_id":"default","region":"US","niche":"tech","platforms":[],"role":"creator","keywords":[]}]' > "$USERS_FILE"
+  echo '[{"user_id":"default","region":"US","niche":"tech","platforms":[],"role":"creator","keywords":[],"content_formats":[]}]' > "$USERS_FILE"
   echo "No Supabase configured, using default user"
 fi
 
@@ -559,194 +559,89 @@ with ThreadPoolExecutor(max_workers=10) as pool:
 print(f'  Agents done: {succeeded} ok, {failed} failed')
 "
 
-  # ── Aggregate + Summary + Final output ─────────────────────────────────────
-  write_progress "p['steps']['users']['current_step'] = 'summarizing'"
-  echo "[$(date -u +%H:%M:%S)]   Aggregating and summarizing..."
+  # ── Scoring agent ────────────────────────────────────────────────────────────
+  write_progress "p['steps']['users']['current_step'] = 'scoring'"
+  echo "[$(date -u +%H:%M:%S)]   Running scoring agent..."
 
-  export USER_SOURCES USER_AGENTS USER_TMP COMBINED_FILE TYPE NICHE TODAY
+  SCORED_FILE="$USER_TMP/_scored.json"
+  python3 "$SCRIPT_DIR/scoring-agent.py" \
+    --agents-dir "$USER_AGENTS" \
+    --sources-dir "$USER_SOURCES" \
+    --raw-data "$COMBINED_FILE" \
+    --output "$SCORED_FILE"
+
+  # ── Orchestration agent ──────────────────────────────────────────────────────
+  write_progress "p['steps']['users']['current_step'] = 'personalizing'"
+  echo "[$(date -u +%H:%M:%S)]   Running orchestration agent..."
+
+  ORCHESTRATED_FILE="$USER_TMP/_orchestrated.json"
+  python3 "$SCRIPT_DIR/orchestration-agent.py" \
+    --scored-file "$SCORED_FILE" \
+    --user-profile "$USER_TMP/config.json" \
+    --output "$ORCHESTRATED_FILE" || {
+    echo "  Orchestration failed, using scored output"
+    cp "$SCORED_FILE" "$ORCHESTRATED_FILE"
+  }
+
+  # ── Bridging agent ──────────────────────────────────────────────────────────
+  write_progress "p['steps']['users']['current_step'] = 'briefing'"
+  echo "[$(date -u +%H:%M:%S)]   Running bridging agent..."
+
+  BRIDGED_FILE="$USER_TMP/_bridged.json"
+  python3 "$SCRIPT_DIR/bridging-agent.py" \
+    --orchestrated-file "$ORCHESTRATED_FILE" \
+    --sources-dir "$USER_SOURCES" \
+    --user-profile "$USER_TMP/config.json" \
+    --run-type "$TYPE" \
+    --output "$BRIDGED_FILE" || {
+    echo "  Bridging failed, using orchestrated output"
+    cp "$ORCHESTRATED_FILE" "$BRIDGED_FILE"
+  }
+
+  # ── Summary agent + Final output ─────────────────────────────────────────────
+  write_progress "p['steps']['users']['current_step'] = 'summarizing'"
+  echo "[$(date -u +%H:%M:%S)]   Running summary agent..."
+
+  export USER_TMP BRIDGED_FILE TYPE NICHE TODAY
 
   python3 << 'AGGEOF'
-import json, os, re, math, time, sys
+import json, os, time, sys
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
-user_sources = os.environ.get('USER_SOURCES', '/tmp')
-user_agents = os.environ.get('USER_AGENTS', '/tmp')
 user_tmp = os.environ.get('USER_TMP', '/tmp')
-combined_file = os.environ.get('COMBINED_FILE', '')
+orchestrated_file = os.environ.get('BRIDGED_FILE', '') or os.environ.get('ORCHESTRATED_FILE', '')
 run_type = os.environ.get('TYPE', 'pulse')
 niche = os.environ.get('NICHE', 'tech')
 today = os.environ.get('TODAY', '')
 api_key = os.environ.get('OPENAI_API_KEY', '')
 
-now = datetime.now(timezone.utc).isoformat()
+# Load orchestrated data (or scored data as fallback)
+with open(orchestrated_file) as f:
+    output = json.load(f)
 
-VALID_MOMENTUM = {'rising', 'falling', 'stable', 'new', 'viral'}
+output['type'] = run_type
 
-def log_score(raw_val):
-    if raw_val <= 0: return 1
-    if raw_val <= 1: return max(1, int(raw_val))
-    return min(100, max(1, int(30 + 70 * math.log10(raw_val) / math.log10(100000))))
-
-def build_metric(item):
-    parts = []
-    if item.get('score') and item.get('comments'):
-        parts.append(f"{item['score']} pts, {item['comments']} comments")
-    elif item.get('score'):
-        parts.append(f"{item['score']} pts")
-    if item.get('views'):
-        v = item['views']
-        if v >= 1_000_000: parts.append(f"{v/1_000_000:.1f}M views")
-        elif v >= 1_000: parts.append(f"{v/1_000:.1f}K views")
-        else: parts.append(f"{v} views")
-    if item.get('stars'):
-        s = item['stars']
-        parts.append(f"{s/1_000:.1f}K stars" if s >= 1_000 else f"{s} stars")
-    if item.get('priceChange'): parts.append(item['priceChange'])
-    return ' | '.join(parts)
-
-def get_raw_score(item):
-    for key in ['score', 'views', 'stars']:
-        val = item.get(key)
-        if val and isinstance(val, (int, float)) and val > 0:
-            return val
-    c = item.get('comments')
-    if c and isinstance(c, (int, float)) and c > 0:
-        return c * 5
-    return 0
-
-def derive_momentum(item):
-    pc = item.get('priceChange', '')
-    if isinstance(pc, str) and pc:
-        try:
-            num = float(pc.replace('%','').replace('(24h)','').replace('+','').strip())
-            if num > 10: return 'viral'
-            elif num > 0: return 'rising'
-            elif num < -5: return 'falling'
-        except ValueError: pass
-    return 'new'
-
-def fallback_parse(name, items):
-    trends = []
-    for item in items:
-        title = item.get('title', '').strip()
-        if not title: continue
-        raw = get_raw_score(item)
-        score = log_score(raw) if raw > 0 else 10
-        reach = 'high' if score >= 70 else 'medium' if score >= 40 else 'low'
-        raw_url = item.get('url', '')
-        if isinstance(raw_url, dict): raw_url = raw_url.get('@_href', '')
-        urls = [raw_url] if raw_url and isinstance(raw_url, str) else []
-        trends.append({
-            'title': title, 'description': item.get('description', '') or '',
-            'why_trending': '', 'momentum': derive_momentum(item),
-            'popularity': {'score': score, 'metric': build_metric(item), 'reach': reach},
-            'sources': [name], 'urls': urls,
-            'first_seen': item.get('publishedAt'), 'relevance': reach
-        })
-    trends.sort(key=lambda x: x['popularity']['score'], reverse=True)
-    return trends
-
-# Load manifest + scraper data
-with open(os.path.join(user_sources, '_manifest.json')) as f:
-    manifest = json.load(f)
-with open(combined_file) as f:
-    scraper_data = json.load(f)
-scraper_by_name = {s.get('source', ''): s for s in scraper_data.get('sources', [])}
-
-categories = []
+# Collect all trends for summary agent
 all_trends = []
-sources_ok = 0
-sources_failed = []
-agent_enriched = 0
-fallback_used = 0
+for cat in output.get('categories', []):
+    all_trends.extend(cat.get('trends', []))
+all_trends.sort(key=lambda x: x.get('popularity', {}).get('score', 0), reverse=True)
 
-for entry in manifest:
-    name = entry['name']
-    # Blog items are served separately via social_trend_items — skip from trend categories
-    if name == 'Social Trend Blogs':
-        continue
-    if entry['status'] != 'ok' or not entry.get('file'):
-        if entry['status'] in ('error', 'skipped'):
-            sources_failed.append(name)
-        continue
-    sources_ok += 1
-    safe_name = entry.get('safe_name', '')
-    agent_file = os.path.join(user_agents, f"{safe_name}.json")
-    trends = None
-
-    if os.path.exists(agent_file) and os.path.getsize(agent_file) > 0:
-        try:
-            with open(agent_file) as f:
-                raw = f.read()
-            text = raw.strip()
-            text = re.sub(r'```json\s*', '', text)
-            text = re.sub(r'```\s*', '', text).strip()
-            agent_json = json.loads(text)
-            if 'trends' in agent_json and isinstance(agent_json['trends'], list):
-                trends = []
-                for t in agent_json['trends']:
-                    mom = t.get('momentum', 'new')
-                    if mom not in VALID_MOMENTUM: mom = 'new'
-                    score = t.get('popularity', {}).get('score', 50)
-                    if not isinstance(score, (int, float)): score = 50
-                    score = max(1, min(100, int(score)))
-                    reach = t.get('popularity', {}).get('reach', 'medium')
-                    if reach not in ('high', 'medium', 'low'):
-                        reach = 'high' if score >= 70 else 'medium' if score >= 40 else 'low'
-                    urls = t.get('urls', [])
-                    if isinstance(urls, str): urls = [urls]
-                    trends.append({
-                        'title': t.get('title', ''), 'description': t.get('description', ''),
-                        'why_trending': t.get('why_trending', ''), 'momentum': mom,
-                        'popularity': {'score': score, 'metric': t.get('popularity', {}).get('metric', ''), 'reach': reach},
-                        'sources': [name], 'urls': urls,
-                        'first_seen': t.get('first_seen'), 'relevance': t.get('relevance', 'medium')
-                    })
-                trends.sort(key=lambda x: x['popularity']['score'], reverse=True)
-                agent_enriched += 1
-        except Exception as e:
-            print(f"    Agent parse error for {name}: {e}", file=sys.stderr)
-
-    if trends is None:
-        items = scraper_by_name.get(name, {}).get('items', [])
-        if items:
-            trends = fallback_parse(name, items)
-            fallback_used += 1
-
-    if trends:
-        categories.append({'name': name, 'trends': trends})
-        all_trends.extend(trends)
-
-categories.sort(key=lambda c: len(c['trends']), reverse=True)
-all_trends.sort(key=lambda x: x['popularity']['score'], reverse=True)
-
-# Build preliminary output
-direction_map = {'rising': 'up', 'viral': 'up', 'new': 'new', 'falling': 'down', 'stable': 'stable'}
-top_movers = [{'title': t['title'], 'direction': direction_map.get(t['momentum'], 'up'), 'delta': f"Score: {t['popularity']['score']}"} for t in all_trends[:5]]
-total_items = sum(len(c['trends']) for c in categories)
-
-output = {
-    'type': run_type, 'timestamp': now,
-    'data_quality': {'sources_ok': sources_ok, 'sources_failed': sources_failed, 'total_raw_items': total_items, 'agent_enriched': agent_enriched, 'fallback_used': fallback_used},
-    'categories': categories, 'top_movers': top_movers,
-    'signals': {'emerging': [], 'fading': []},
-    'summary': f'{total_items} trends from {sources_ok} sources ({agent_enriched} agent-enriched) for niche: {niche}.'
-}
+total_items = len(all_trends)
 
 # ── Summary agent (gpt-4o) ──
 print(f"  Running summary agent...", file=sys.stderr)
 try:
     prompt = f"""Today is {today}. Run type: {run_type}. User niche: {niche}.
 
-{len(all_trends)} enriched trends from multiple sources for a user interested in "{niche}":
+{len(all_trends)} scored trends (cross-platform duplicates already merged, scores are signal-based):
 
 {json.dumps(all_trends[:30], indent=1)}
 
-1. Cross-reference trends across sources
-2. Generate top_movers (top 5 by significance for this niche)
-3. Generate signals: emerging (new notable trends) and fading
-4. Write a 3-5 sentence summary focused on what matters for the "{niche}" niche
+1. Generate top_movers (top 5 by significance for this niche)
+2. Generate signals: emerging (new notable trends) and fading
+3. Write a 3-5 sentence summary focused on what matters for the "{niche}" niche
 
 Return ONLY JSON:
 {{"top_movers": [{{"title": "...", "direction": "up|down|new", "delta": "brief"}}], "signals": {{"emerging": ["..."], "fading": ["..."]}}, "summary": "3-5 sentences"}}"""
@@ -773,12 +668,13 @@ Return ONLY JSON:
     print(f"    ✓ Summary agent: {len(content)}b ({time.time()-start:.1f}s)", file=sys.stderr)
 except Exception as e:
     print(f"    ✗ Summary agent failed: {str(e)[:120]}", file=sys.stderr)
+    output['summary'] = f'{total_items} trends from {output["data_quality"]["sources_ok"]} sources for niche: {niche}.'
 
 # Write final output
 final_file = os.path.join(user_tmp, '_final.json')
 with open(final_file, 'w') as f:
     json.dump(output, f)
-print(f"  Final: {total_items} trends, {sources_ok} sources", file=sys.stderr)
+print(f"  Final: {total_items} trends, {output['data_quality']['sources_ok']} sources", file=sys.stderr)
 AGGEOF
 
   # ── Store to Supabase with user_id ─────────────────────────────────────────
