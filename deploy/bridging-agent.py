@@ -670,10 +670,23 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True, help="Output file path")
     args = parser.parse_args()
 
-    run_bridging(
-        args.orchestrated_file,
-        args.sources_dir,
-        args.user_profile,
-        args.run_type,
-        args.output,
-    )
+    try:
+        run_bridging(
+            args.orchestrated_file,
+            args.sources_dir,
+            args.user_profile,
+            args.run_type,
+            args.output,
+        )
+    except Exception as e:
+        import traceback
+        print(f"  Bridging CRASHED: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        # Last-resort fallback: copy orchestrated to output so pipeline continues
+        try:
+            import shutil
+            shutil.copy2(args.orchestrated_file, args.output)
+            print("  Copied orchestrated → bridged as fallback", file=sys.stderr)
+        except Exception:
+            pass
+        sys.exit(1)

@@ -588,15 +588,21 @@ print(f'  Agents done: {succeeded} ok, {failed} failed')
   echo "[$(date -u +%H:%M:%S)]   Running bridging agent..."
 
   BRIDGED_FILE="$USER_TMP/_bridged.json"
+  BRIDGING_LOG="$USER_TMP/_bridging.log"
   python3 "$SCRIPT_DIR/bridging-agent.py" \
     --orchestrated-file "$ORCHESTRATED_FILE" \
     --sources-dir "$USER_SOURCES" \
     --user-profile "$USER_TMP/config.json" \
     --run-type "$TYPE" \
-    --output "$BRIDGED_FILE" || {
-    echo "  Bridging failed, using orchestrated output"
+    --output "$BRIDGED_FILE" 2>"$BRIDGING_LOG"
+  BRIDGING_EXIT=$?
+  # Print bridging output (stderr was captured to log)
+  cat "$BRIDGING_LOG" >&2
+  if [ $BRIDGING_EXIT -ne 0 ]; then
+    echo "  Bridging failed (exit $BRIDGING_EXIT), using orchestrated output"
+    echo "  Error log: $(tail -3 "$BRIDGING_LOG")"
     cp "$ORCHESTRATED_FILE" "$BRIDGED_FILE"
-  }
+  fi
 
   # ── Summary agent + Final output ─────────────────────────────────────────────
   write_progress "p['steps']['users']['current_step'] = 'summarizing'"
