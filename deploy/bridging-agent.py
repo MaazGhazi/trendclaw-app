@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
 
@@ -124,21 +125,85 @@ def load_sounds(sources_dir):
     return sounds
 
 
+def parse_item_date(item):
+    """Extract the most relevant date from a format/sound item. Returns datetime or None."""
+    for key in ("firstSeenAt", "lastSeenAt", "first_seen_at", "last_seen_at"):
+        val = item.get(key) or item.get("extra", {}).get(key)
+        if val and isinstance(val, str):
+            try:
+                ts = val.replace("Z", "+00:00")
+                if "T" not in ts:
+                    ts += "T00:00:00+00:00"
+                elif "+" not in ts[10:] and "-" not in ts[10:]:
+                    ts += "+00:00"
+                return datetime.fromisoformat(ts)
+            except (ValueError, TypeError):
+                continue
+    return None
+
+
+def days_old(item):
+    """How many days old is this item? Returns float. None → 999."""
+    dt = parse_item_date(item)
+    if not dt:
+        return 999.0
+    now = datetime.now(timezone.utc)
+    return max(0, (now - dt).total_seconds() / 86400)
+
+
+MAX_FORMAT_AGE_DAYS = 14
+
+
 def select_top_formats(formats, max_count=20):
-    """Select top format items, preferring new ones and longer descriptions."""
-    scored = []
+    """Select top format items. Filters out stale formats (>14 days) and weights recency heavily."""
+    now = datetime.now(timezone.utc)
+
+    # Step 1: filter out stale formats
+    fresh = []
+    stale_count = 0
     for f in formats:
-        s = 0
-        if f.get("isNew") or f.get("extra", {}).get("isNew"):
+        age = days_old(f)
+        if age <= MAX_FORMAT_AGE_DAYS:
+            fresh.append(f)
+        else:
+            stale_count += 1
+
+    if stale_count > 0:
+        print(
+            f"    Formats: {len(fresh)} fresh, {stale_count} filtered (>{MAX_FORMAT_AGE_DAYS}d old)",
+            file=sys.stderr,
+        )
+
+    # Step 2: score remaining formats
+    scored = []
+    for f in fresh:
+        s = 0.0
+        age = days_old(f)
+
+        # Recency is the dominant signal (0-20 points)
+        if age <= 2:
+            s += 20
+        elif age <= 5:
+            s += 15
+        elif age <= 7:
             s += 10
+        else:
+            s += 5
+
+        # isNew bonus (genuinely new to our tracking)
+        if f.get("isNew") or f.get("extra", {}).get("isNew"):
+            s += 5
+
+        # Description quality (up to 5 pts — minor vs recency)
         desc = f.get("description", "") or ""
-        s += min(len(desc), 300) / 30  # up to 10 pts for description length
+        s += min(len(desc), 200) / 40
+
         platform = f.get("platform") or f.get("extra", {}).get("platform", "")
         scored.append((s, platform, f))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    # Balance across platforms
+    # Step 3: balance across platforms
     selected = []
     platform_counts = {}
     for s, plat, f in scored:
@@ -234,7 +299,9 @@ def build_prompt(topics, formats, sounds, user_profile):
         '"watch_signals": [{"type": "watch_signal", "sound_idx": 0, ...}]}\n\n'
         "Limits: max 5 full_brief, 3 angle_only, 3 participation, "
         "2 opportunity_flag, 2 watch_signal.\n"
-        "Hooks must be specific and actionable. Reference the user's platform and niche."
+        "Hooks must be specific and actionable. Reference the user's platform and niche.\n"
+        "IMPORTANT: Only use formats that are genuinely current (last 7 days preferred). "
+        "Never recommend a format that is clearly outdated or seasonal from months ago."
     )
 
     # User section
@@ -272,14 +339,16 @@ def build_prompt(topics, formats, sounds, user_profile):
 
     if formats:
         lines.append("")
-        lines.append("FORMATS:")
+        lines.append("FORMATS (all within last 14 days):")
         for i, f in enumerate(formats):
             platform = f.get("platform") or f.get("extra", {}).get("platform", "social")
             is_new = f.get("isNew") or f.get("extra", {}).get("isNew", False)
             new_tag = ", new" if is_new else ""
             desc = (f.get("description", "") or "")[:120]
+            age = days_old(f)
+            age_str = f"{int(age)}d ago" if age < 999 else ""
             lines.append(
-                f'[F{i}] "{f.get("title", "")[:60]}" ({platform}{new_tag}) — {desc}'
+                f'[F{i}] "{f.get("title", "")[:60]}" ({platform}{new_tag}, {age_str}) — {desc}'
             )
 
     if sounds:
